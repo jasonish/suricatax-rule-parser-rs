@@ -1,0 +1,17 @@
+language = "C"
+
+[export]
+
+item_types = [
+    "functions", "enums", "opaque", "structs",
+]
+
+include = [
+    "Header",
+    "Endian",
+    "ByteJumpOption",
+    "CFlowbits",
+]
+
+[enum]
+rename_variants = "QualifiedScreamingSnakeCase"
