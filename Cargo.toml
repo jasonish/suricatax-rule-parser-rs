@@ -1,0 +1,19 @@
+[package]
+name = "suricata-rule-parser"
+version = "0.1.0"
+authors = ["Jason Ish <ish@unx.ca>"]
+edition = "2018"
+
+[lib]
+crate-type = ["rlib", "staticlib", "cdylib"]
+
+[features]
+default = ["serde_support"]
+serde_support = ["serde"]
+
+[dependencies]
+nom = "7"
+serde = { version = "1.0.130", default_features = false, features = ["std", "derive"], optional = true }
+
+[dev-dependencies]
+serde_json = "*"
