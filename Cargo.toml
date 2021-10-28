@@ -17,3 +17,4 @@ serde = { version = "1.0.130", default_features = false, features = ["std", "der
 
 [dev-dependencies]
 serde_json = "*"
+clap = "3.0.0-beta.5"
