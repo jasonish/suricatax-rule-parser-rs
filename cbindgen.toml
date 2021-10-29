@@ -3,14 +3,18 @@ language = "C"
 [export]
 
 item_types = [
-    "functions", "enums", "opaque", "structs",
+  "functions",
+  "enums",
+  "opaque",
+  "structs",
 ]
 
 include = [
-    "Header",
-    "Endian",
-    "ByteJumpOption",
-    "CFlowbits",
+  "Header",
+  "Endian",
+  "ByteJumpOption",
+  "CFlowbits",
+  "ElementTag",
 ]
 
 [enum]

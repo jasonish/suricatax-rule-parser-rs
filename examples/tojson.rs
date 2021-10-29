@@ -22,8 +22,9 @@
 
 use std::fs::File;
 use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Lines;
 use suricata_rule_parser;
-use suricata_rule_parser::NewRule;
 
 #[derive(clap::Parser)]
 struct Opts {
@@ -41,30 +42,61 @@ fn main() {
     let start = std::time::Instant::now();
     for filename in &opts.filenames {
         let file: File = File::open(filename).unwrap();
-        let reader = std::io::BufReader::new(file).lines();
-        for line in reader {
-            if let Ok(line) = line {
-                if line.starts_with("#") {
-                    continue;
+        let mut reader = std::io::BufReader::new(file).lines();
+
+        loop {
+            match next_line(&mut reader) {
+                Err(err) => {
+                    eprintln!("io error: {:?}", err);
+                    break;
                 }
-                match suricata_rule_parser::parse_rule(&line) {
-                    Err(err) => {
-                        eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
+                Ok(None) => {
+                    break;
+                }
+                Ok(Some(line)) => {
+                    if line.is_empty() || line.starts_with("#") {
+                        continue;
                     }
-                    Ok((_rem, rule)) => {
-                        count += 1;
-                        let rule: NewRule = rule.into();
-                        let encoded = serde_json::to_string(&rule).unwrap();
-                        if !opts.quiet {
-                            println!("{}", encoded);
+                    match suricata_rule_parser::parse_elements(&line) {
+                        Err(err) => {
+                            eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
                         }
+                        Ok((_rem, rule)) => match suricata_rule_parser::reduce_elements(rule) {
+                            Ok((_, elements)) => {
+                                count += 1;
+                                let encoded = serde_json::to_string(&elements).unwrap();
+                                if !opts.quiet {
+                                    println!("{}", encoded);
+                                }
+                            }
+                            Err(err) => {
+                                eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
+                            }
+                        },
                     }
                 }
-            } else {
-                break;
             }
         }
     }
     let elapsed = start.elapsed();
     eprintln!("Parsed {} rules in {:?}", count, elapsed);
+}
+
+// Helper to read multiline rules from a file.
+fn next_line(reader: &mut Lines<BufReader<File>>) -> Result<Option<String>, std::io::Error> {
+    let mut buffer = String::new();
+    for line in reader {
+        let line = line?;
+        if !line.trim().ends_with('\\') {
+            if buffer.is_empty() {
+                return Ok(Some(line));
+            } else {
+                buffer.push_str(&line);
+                return Ok(Some(buffer));
+            }
+        } else {
+            buffer.push_str(&line[0..line.len() - 1]);
+        }
+    }
+    Ok(None)
 }

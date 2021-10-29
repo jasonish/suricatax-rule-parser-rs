@@ -23,51 +23,90 @@
 use std::ffi::{c_void, CStr, CString};
 use std::os::raw::c_char;
 
-use crate::{FlowbitCommand, NewRule};
-use crate::{Flowbits, RuleOption};
+use crate::Flowbits;
+use crate::{Element, FlowbitCommand};
 
-#[repr(C)]
-pub struct CRule {
-    pub action: *const c_char,
-    pub proto: *const c_char,
-    pub option_count: usize,
-
-    // An array of CRuleOptions which are safe to read from C.
-    pub options: *const CRuleOption,
-
-    // The actual option data is stored here.
-    pub __options: *const c_void,
-}
-
-#[repr(C)]
-pub enum COptionType {
-    Unknown,
+#[repr(u16)]
+pub enum ElementTag {
+    Action,
+    Protocol,
+    SrcAddr,
+    SrcPort,
+    Direction,
+    DstAddr,
+    DstPort,
     ByteJump,
-    Metadata,
-    Reference,
-    Offset,
+    Classtype,
+    Content,
+    Depth,
+    Dsize,
+    Distance,
+    EndsWith,
+    FastPattern,
+    FileData,
+    Flow,
     Flowbits,
+    FtpBounce,
+    IsDataAt,
+    Message,
+    Metadata,
+    NoAlert,
+    NoCase,
+    Offset,
+    Pcre,
+    RawBytes,
+    Reference,
+    Rev,
+    Sid,
+    StartsWith,
+    Within,
+    GenericOption,
 }
 
-impl From<&RuleOption> for COptionType {
-    fn from(o: &RuleOption) -> Self {
-        match o {
-            RuleOption::ByteJump(_) => Self::ByteJump,
-            RuleOption::Metadata(_) => Self::Metadata,
-            RuleOption::Reference(_) => Self::Reference,
-            RuleOption::Offset(_) => Self::Offset,
-            RuleOption::Flowbits(_) => Self::Flowbits,
-            _ => panic!("unknown option"),
+// This is more or less here to make sure ElementTag stays in sync with Element.
+impl From<&Element> for ElementTag {
+    fn from(e: &Element) -> ElementTag {
+        match e {
+            // Header elements.
+            Element::Action(_) => Self::Action,
+            Element::Protocol(_) => Self::Protocol,
+            Element::SrcAddr(_) => Self::SrcAddr,
+            Element::SrcPort(_) => Self::SrcPort,
+            Element::Direction(_) => Self::Direction,
+            Element::DstAddr(_) => Self::DstAddr,
+            Element::DstPort(_) => Self::DstPort,
+
+            // Option elements in alphabetical order.
+            Element::Flowbits(_) => Self::Flowbits,
+
+            _ => unimplemented!(),
         }
     }
 }
 
 #[repr(C)]
-pub struct CRuleOption {
-    pub option_type: COptionType,
-    pub option: *const c_void,
+pub struct CElement {
+    pub tag: ElementTag,
+    pub val: *const c_void,
 }
 
+impl Drop for CElement {
+    fn drop(&mut self) {
+        unsafe {
+            match self.tag {
+                ElementTag::Action => {
+                    CString::from_raw(self.val as *mut c_char);
+                }
+                ElementTag::Flowbits => {
+                    Box::from_raw(self.val as *mut CFlowbits);
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
 #[repr(C)]
 pub struct CFlowbits {
     pub command: FlowbitCommand,
@@ -92,6 +131,7 @@ impl From<&Flowbits> for CFlowbits {
             names: cnames.as_ptr() as *const *const c_char,
             __names: names.as_ptr() as *const c_void,
         };
+        dbg!(&cflowbits);
         // Forget about the 2 arrays, they'll be remembered in the Drop impl.
         std::mem::forget(cnames);
         std::mem::forget(names);
@@ -109,124 +149,51 @@ impl Drop for CFlowbits {
 }
 
 /// # Safety
-///
-/// This function is unsafe as it has to convert a C string to a Rust string, so should only be
-/// called with valid C (nul terminated) strings.
+/// 
+/// It's FFI!
 #[no_mangle]
-pub unsafe extern "C" fn parse_rule(input: *const c_char) -> *mut CRule {
+pub unsafe extern "C" fn srp_parse_elements(
+    input: *const c_char,
+    size: *mut usize,
+) -> *const CElement {
     let input = CStr::from_ptr(input).to_str().unwrap();
-    let (_, rule) = crate::parse_rule(input).unwrap();
-    let rule: NewRule = rule.into();
+    let (_, elements) = crate::parse_elements(input).unwrap();
+    let (_, elements) = crate::reduce_elements(elements).unwrap();
 
-    let mut options = rule.options;
-    options.shrink_to_fit();
-    let mut coptions = Vec::with_capacity(options.len());
-    for option in &options {
-        match option {
-            RuleOption::ByteJump(byte_jump) => {
-                let coption = CRuleOption {
-                    option_type: option.into(),
-                    option: byte_jump as *const _ as *mut c_void,
+    // Now convert the elements to C style structs.
+    let mut celements = Vec::new();
+    for element in &elements {
+        match element {
+            Element::Action(action) => {
+                let ce = CElement {
+                    tag: element.into(),
+                    val: CString::new(action.to_string()).unwrap().into_raw() as *const c_void,
                 };
-                coptions.push(coption);
+                celements.push(ce);
             }
-            // All options that are just a string can be handled here.
-            RuleOption::Metadata(string) | RuleOption::Reference(string) => {
-                let coption = CRuleOption {
-                    option_type: option.into(),
-                    option: CString::new(string.to_string()).unwrap().into_raw() as *const c_void,
+            Element::Flowbits(flowbits) => {
+                let tag: ElementTag = element.into();
+                let cf: CFlowbits = flowbits.into();
+                let ce = CElement {
+                    tag,
+                    val: Box::into_raw(Box::new(cf)) as *const c_void,
                 };
-                coptions.push(coption);
+                celements.push(ce);
             }
-            RuleOption::Offset(u) => {
-                let coption = CRuleOption {
-                    option_type: option.into(),
-                    option: Box::into_raw(Box::new(*u)) as *const c_void,
-                };
-                coptions.push(coption);
-            }
-            RuleOption::Flowbits(flowbits) => {
-                dbg!(flowbits);
-                let coption = CRuleOption {
-                    option_type: option.into(),
-                    option: Box::into_raw(Box::new(CFlowbits::from(flowbits))) as *const c_void,
-                };
-                coptions.push(coption);
-            }
-            _ => {
-                let coption = CRuleOption {
-                    option_type: COptionType::Unknown,
-                    option: std::ptr::null(),
-                };
-                coptions.push(coption);
-            }
+            _ => {}
         }
     }
-
-    let crule = CRule {
-        action: CString::new(rule.action).unwrap().into_raw(),
-        proto: CString::new(rule.proto).unwrap().into_raw(),
-        option_count: options.len(),
-        options: coptions.as_ptr(),
-        __options: options.as_ptr() as *const c_void,
-    };
-    std::mem::forget(options);
-    std::mem::forget(coptions);
-    Box::into_raw(Box::new(crule))
+    celements.shrink_to_fit();
+    *size = celements.len();
+    let r = celements.as_ptr() as *const CElement;
+    std::mem::forget(celements);
+    r
 }
 
 /// # Safety
-///
-/// As this function dereferences raw pointers it is unsafe. It should only be used to free a
-/// `CRule` object return ed from `parse_rule`.
+/// 
+/// It's FFI!
 #[no_mangle]
-pub unsafe extern "C" fn rule_free(rule: *mut CRule) {
-    std::mem::drop(Box::from_raw(rule));
-}
-
-/// Drop implementation for CRule.
-///
-/// Just resume ownership of everything that was forgotten.
-impl Drop for CRule {
-    fn drop(&mut self) {
-        unsafe {
-            Vec::from_raw_parts(
-                self.__options as *mut RuleOption,
-                self.option_count,
-                self.option_count,
-            );
-            Vec::from_raw_parts(
-                self.options as *mut CRuleOption,
-                self.option_count,
-                self.option_count,
-            );
-            CString::from_raw(self.action as *mut c_char);
-            CString::from_raw(self.proto as *mut c_char);
-        }
-    }
-}
-
-/// Drop implementation for CRuleOption.
-///
-/// For Rust options that are repr(C) no special drop handling is required. However, other
-/// options probably had to allocate and forget data before passing the CRuleOption to C.
-impl Drop for CRuleOption {
-    fn drop(&mut self) {
-        unsafe {
-            match self.option_type {
-                // Options that are just a string.
-                COptionType::Metadata | COptionType::Reference => {
-                    CString::from_raw(self.option as *mut c_char);
-                }
-                // Options that are just a u64.
-                COptionType::Offset => {
-                    Box::from_raw(self.option as *mut u64);
-                }
-                COptionType::Flowbits => {
-                    Box::from_raw(self.option as *mut CFlowbits);
-                }
-                _ => {}
-            }
-        }
-    }
+pub unsafe extern "C" fn srp_free_elements(elements: *const CElement, size: usize) {
+    let _elements = Vec::from_raw_parts(elements as *mut CElement, size, size);
 }

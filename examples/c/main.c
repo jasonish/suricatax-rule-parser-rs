@@ -21,48 +21,34 @@ int main(int argc, char **argv)
         "metadata:created_at 2016_06_06, former_category MALWARE, updated_at "
         "2016_06_06;)";
 
-    CRule *rule = parse_rule(input);
-    printf("rule: %p\n", rule);
-    printf("- action: %s\n", rule->action);
-    printf("- proto: %s\n", rule->proto);
-
-    for (int i = 0; i < rule->option_count; i++) {
-        const CRuleOption *option = &rule->options[i];
-        switch (option->option_type) {
-            case C_OPTION_TYPE_BYTE_JUMP: {
-                const ByteJumpOption *byte_jump = option->option;
-                printf("- byte_jump:\n");
-                printf("-- count: %u\n", byte_jump->count);
-                printf("-- offset: %u\n", byte_jump->offset);
-                printf("-- from_beginning: %d\n", byte_jump->from_beginning);
+    uintptr_t count;
+    const CElement *elements = srp_parse_elements(input, &count);
+    printf("Number of elements: %u\n", count);
+    for (uintptr_t i = 0; i < count; i++) {
+        CElement element = elements[i];
+        printf("Tag: %u\n", element.tag);
+        switch (element.tag) {
+            case ELEMENT_TAG_ACTION: {
+                const char *action = element.val;
+                printf("- action: %s\n", action);
                 break;
             }
-            case C_OPTION_TYPE_METADATA: {
-                const char *metadata = option->option;
-                printf("- metadata: %s\n", metadata);
-                break;
-            }
-            case C_OPTION_TYPE_OFFSET: {
-                const uint64_t *offset = option->option;
-                printf("- offset: %"PRIu64"\n", *offset);
-                break;
-            }
-            case C_OPTION_TYPE_FLOWBITS: {
-                const CFlowbits *flowbits = option->option;
-                printf("- flowbits: %d\n", flowbits->command);
+            case ELEMENT_TAG_FLOWBITS: {
+                const CFlowbits *flowbits = element.val;
+                printf("- flowbits: command=%d\n", flowbits->command);
                 for (int i = 0; i < flowbits->size; i++) {
-                    printf("-- flowbit name: %s\n", flowbits->names[i]);
+                    printf("-- name: %s\n", flowbits->names[i]);
                 }
                 break;
             }
-            default:
-                printf("warning: don't know how to handle option: %d\n",
-                    option->option_type);
+            default: {
+                printf("Element tag %d not supported.\n", element.tag);
                 break;
+            }
         }
     }
 
-    rule_free(rule);
+    srp_free_elements(elements, count);
 
     return 0;
 }
