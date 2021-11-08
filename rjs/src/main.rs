@@ -20,11 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use serde::Serialize;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::Lines;
 use std::io::Read;
-use suricata_rule_parser;
+use suricata_rule_parser::types::Direction;
+use suricata_rule_parser::Element;
 
 #[derive(clap::Parser)]
 struct Opts {
@@ -32,8 +34,105 @@ struct Opts {
     #[clap(short, long)]
     quiet: bool,
 
+    /// Output to YAML instead of JSON.
+    #[clap(long)]
+    yaml: bool,
+
+    /// Output raw elements instead of a constructed rule.
+    #[clap(long)]
+    elements: bool,
+
     /// List of filenames to parse.
     filenames: Vec<String>,
+}
+
+/// An idea of what a structured rule could look like.
+///
+/// This is not part of the parsing library yet as this could be somewhat
+/// subjective.
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+struct Rule {
+    // Header.
+    action: String,
+    protocol: String,
+    src_addr: String,
+    src_port: String,
+    direction: Direction,
+    dst_addr: String,
+    dst_port: String,
+
+    // Rule options that should only exist once or get aggregated into a single
+    // entry.
+    message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    classtype: Option<String>,
+    signature_id: Option<u64>,
+    revision: u64,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    reference: Vec<String>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    metadata: String,
+
+    options: Vec<Element>,
+}
+
+impl From<Vec<Element>> for Rule {
+    fn from(elements: Vec<Element>) -> Rule {
+        let mut rule = Rule::default();
+        for element in elements {
+            match element {
+                Element::Action(action) => {
+                    rule.action = action;
+                }
+                Element::Protocol(protocol) => {
+                    rule.protocol = protocol;
+                }
+                Element::SrcAddr(addr) => {
+                    rule.src_addr = addr;
+                }
+                Element::SrcPort(port) => {
+                    rule.src_port = port;
+                }
+                Element::Direction(direction) => {
+                    rule.direction = direction;
+                }
+                Element::DstAddr(addr) => {
+                    rule.dst_addr = addr;
+                }
+                Element::DstPort(port) => {
+                    rule.dst_port = port;
+                }
+                Element::Message(message) => {
+                    rule.message = Some(message);
+                }
+                Element::Classtype(classtype) => {
+                    rule.classtype = Some(classtype);
+                }
+                Element::Sid(sid) => {
+                    rule.signature_id = Some(sid);
+                }
+                Element::Rev(rev) => {
+                    rule.revision = rev;
+                }
+                Element::Reference(reference) => {
+                    rule.reference.push(reference);
+                }
+                Element::Metadata(metadata) => {
+                    if rule.metadata.is_empty() {
+                        rule.metadata = metadata;
+                    } else {
+                        rule.metadata.push_str(", ");
+                        rule.metadata.push_str(&metadata);
+                    }
+                }
+                _ => {
+                    rule.options.push(element);
+                }
+            }
+        }
+        rule
+    }
 }
 
 fn main() {
@@ -44,24 +143,24 @@ fn main() {
     let inputs = if opts.filenames.is_empty() {
         vec!["-".to_string()]
     } else {
-        opts.filenames
+        opts.filenames.clone()
     };
 
     for filename in &inputs {
         if filename == "-" {
             let stdin = std::io::stdin();
-            count += process_file(&mut stdin.lock());
+            count += process_file(&mut stdin.lock(), &opts);
         } else {
             let file: File = File::open(filename).unwrap();
             let mut reader = std::io::BufReader::new(file);
-            count += process_file(&mut reader);
+            count += process_file(&mut reader, &opts);
         }
     }
     let elapsed = start.elapsed();
     eprintln!("Parsed {} rules in {:?}", count, elapsed);
 }
 
-fn process_file<T: BufRead + Read>(reader: &mut T) -> usize {
+fn process_file<T: BufRead + Read>(reader: &mut T, opts: &Opts) -> usize {
     let mut lines = reader.lines();
     let mut count = 0;
     loop {
@@ -74,7 +173,7 @@ fn process_file<T: BufRead + Read>(reader: &mut T) -> usize {
                 break;
             }
             Ok(Some(line)) => {
-                if line.is_empty() || line.starts_with("#") {
+                if line.is_empty() || line.starts_with('#') {
                     continue;
                 }
                 match suricata_rule_parser::parse_elements(&line) {
@@ -84,8 +183,26 @@ fn process_file<T: BufRead + Read>(reader: &mut T) -> usize {
                     Ok((_rem, rule)) => match suricata_rule_parser::reduce_elements(rule) {
                         Ok((_, elements)) => {
                             count += 1;
-                            let encoded = serde_json::to_string(&elements).unwrap();
-                            println!("{}", encoded);
+                            if opts.elements && !opts.quiet {
+                                let encoded = if opts.yaml {
+                                    serde_yaml::to_string(&elements).unwrap()
+                                } else {
+                                    serde_json::to_string(&elements).unwrap()
+                                };
+                                if !opts.quiet {
+                                    println!("{}", encoded);
+                                }
+                            } else if !opts.elements {
+                                let rule = Rule::from(elements);
+                                if !opts.quiet {
+                                    let encoded = if opts.yaml {
+                                        serde_yaml::to_string(&rule).unwrap()
+                                    } else {
+                                        serde_json::to_string(&rule).unwrap()
+                                    };
+                                    println!("{}", encoded);
+                                }
+                            }
                         }
                         Err(err) => {
                             eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
