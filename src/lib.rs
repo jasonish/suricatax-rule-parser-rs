@@ -72,7 +72,11 @@ impl<I> ParseError<I> for RuleParseError<I> {
     }
 }
 
-#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde_support",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "snake_case")
+)]
 #[derive(Clone, Debug, PartialEq)]
 #[repr(u16)]
 pub enum Element {
