@@ -22,8 +22,8 @@
 
 use std::fs::File;
 use std::io::BufRead;
-use std::io::BufReader;
 use std::io::Lines;
+use std::io::Read;
 use suricata_rule_parser;
 
 #[derive(clap::Parser)]
@@ -40,50 +40,66 @@ fn main() {
     let opts: Opts = <Opts as clap::Parser>::parse();
     let mut count = 0;
     let start = std::time::Instant::now();
-    for filename in &opts.filenames {
-        let file: File = File::open(filename).unwrap();
-        let mut reader = std::io::BufReader::new(file).lines();
 
-        loop {
-            match next_line(&mut reader) {
-                Err(err) => {
-                    eprintln!("io error: {:?}", err);
-                    break;
-                }
-                Ok(None) => {
-                    break;
-                }
-                Ok(Some(line)) => {
-                    if line.is_empty() || line.starts_with("#") {
-                        continue;
-                    }
-                    match suricata_rule_parser::parse_elements(&line) {
-                        Err(err) => {
-                            eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
-                        }
-                        Ok((_rem, rule)) => match suricata_rule_parser::reduce_elements(rule) {
-                            Ok((_, elements)) => {
-                                count += 1;
-                                let encoded = serde_json::to_string(&elements).unwrap();
-                                if !opts.quiet {
-                                    println!("{}", encoded);
-                                }
-                            }
-                            Err(err) => {
-                                eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
-                            }
-                        },
-                    }
-                }
-            }
+    let inputs = if opts.filenames.is_empty() {
+        vec!["-".to_string()]
+    } else {
+        opts.filenames
+    };
+
+    for filename in &inputs {
+        if filename == "-" {
+            let stdin = std::io::stdin();
+            count += process_file(&mut stdin.lock());
+        } else {
+            let file: File = File::open(filename).unwrap();
+            let mut reader = std::io::BufReader::new(file);
+            count += process_file(&mut reader);
         }
     }
     let elapsed = start.elapsed();
     eprintln!("Parsed {} rules in {:?}", count, elapsed);
 }
 
+fn process_file<T: BufRead + Read>(reader: &mut T) -> usize {
+    let mut lines = reader.lines();
+    let mut count = 0;
+    loop {
+        match next_line(&mut lines) {
+            Err(err) => {
+                eprintln!("io error: {:?}", err);
+                break;
+            }
+            Ok(None) => {
+                break;
+            }
+            Ok(Some(line)) => {
+                if line.is_empty() || line.starts_with("#") {
+                    continue;
+                }
+                match suricata_rule_parser::parse_elements(&line) {
+                    Err(err) => {
+                        eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
+                    }
+                    Ok((_rem, rule)) => match suricata_rule_parser::reduce_elements(rule) {
+                        Ok((_, elements)) => {
+                            count += 1;
+                            let encoded = serde_json::to_string(&elements).unwrap();
+                            println!("{}", encoded);
+                        }
+                        Err(err) => {
+                            eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
+                        }
+                    },
+                }
+            }
+        }
+    }
+    count
+}
+
 // Helper to read multiline rules from a file.
-fn next_line(reader: &mut Lines<BufReader<File>>) -> Result<Option<String>, std::io::Error> {
+fn next_line<T: BufRead>(reader: &mut Lines<T>) -> Result<Option<String>, std::io::Error> {
     let mut buffer = String::new();
     for line in reader {
         let line = line?;
