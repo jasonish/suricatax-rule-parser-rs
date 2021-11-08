@@ -149,7 +149,7 @@ impl Drop for CFlowbits {
 }
 
 /// # Safety
-/// 
+///
 /// It's FFI!
 #[no_mangle]
 pub unsafe extern "C" fn srp_parse_elements(
@@ -191,7 +191,7 @@ pub unsafe extern "C" fn srp_parse_elements(
 }
 
 /// # Safety
-/// 
+///
 /// It's FFI!
 #[no_mangle]
 pub unsafe extern "C" fn srp_free_elements(elements: *const CElement, size: usize) {
