@@ -27,6 +27,7 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alphanumeric1, multispace0};
 use nom::combinator::{opt, rest};
+use nom::error::ErrorKind;
 use nom::sequence::{preceded, tuple};
 use nom::Err::Error;
 use nom::IResult;
@@ -64,6 +65,9 @@ pub(crate) fn parse_u64<'a>(
 pub(crate) fn parse_list(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
     let mut depth = 0;
     let mut end = 0;
+    if input.is_empty() {
+        return Err(nom::Err::Error(RuleParseError::Nom(input, ErrorKind::Eof)));
+    }
     for (i, c) in input.chars().enumerate() {
         if i == 0 && c != '[' {
             // Cheat a little, just return the next non-whitespace token.
