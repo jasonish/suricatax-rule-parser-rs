@@ -24,10 +24,11 @@ use crate::types;
 use crate::types::*;
 use crate::RuleParseError;
 use nom::branch::alt;
-use nom::bytes::complete::tag;
+use nom::bytes::complete::{is_not, tag};
 use nom::character::complete::{alphanumeric1, multispace0};
 use nom::combinator::{opt, rest};
 use nom::error::ErrorKind;
+use nom::multi::separated_list0;
 use nom::sequence::{preceded, tuple};
 use nom::Err::Error;
 use nom::IResult;
@@ -249,5 +250,37 @@ pub(crate) fn parse_flowbits(input: &str) -> IResult<&str, Flowbits, RuleParseEr
                 ))
             }
         }
+    }
+}
+
+pub(crate) fn parse_flow(input: &str) -> IResult<&str, Vec<Flow>, RuleParseError<&str>> {
+    let (input, values) = separated_list0(tag(","), preceded(multispace0, is_not(",")))(input)?;
+    let mut options = vec![];
+    for option in values {
+        options.push(Flow::from_str(option.trim())?);
+    }
+    Ok((input, options))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_flow() {
+        let flow = parse_flow("to_client,established").unwrap();
+        assert_eq!(flow.1, vec![Flow::ToClient, Flow::Established]);
+
+        let flow = parse_flow("to_client, established").unwrap();
+        assert_eq!(flow.1, vec![Flow::ToClient, Flow::Established]);
+
+        let flow = parse_flow("to_client").unwrap();
+        assert_eq!(flow.1, vec![Flow::ToClient]);
+
+        let flow = parse_flow(" to_client").unwrap();
+        assert_eq!(flow.1, vec![Flow::ToClient]);
+
+        let flow = parse_flow(" to_client  ,    established   ").unwrap();
+        assert_eq!(flow.1, vec![Flow::ToClient, Flow::Established]);
     }
 }
