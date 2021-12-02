@@ -20,13 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
+
 #[cfg(feature = "serde_support")]
 use serde::{Deserialize, Serialize};
 
 use crate::util::is_default;
 use crate::RuleParseError;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 
 /// Byte jump.
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
@@ -232,5 +233,77 @@ pub enum Endian {
 impl Default for Endian {
     fn default() -> Self {
         Self::Big
+    }
+}
+
+// TODO: Should be able to serialize with the to_str() impl..
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[derive(Debug, PartialEq, Clone)]
+pub enum Flow {
+    #[cfg_attr(feature = "serde_support", serde(rename = "to_client"))]
+    ToClient,
+    #[cfg_attr(feature = "serde_support", serde(rename = "to_server"))]
+    ToServer,
+    #[cfg_attr(feature = "serde_support", serde(rename = "from_client"))]
+    FromClient,
+    #[cfg_attr(feature = "serde_support", serde(rename = "from_server"))]
+    FromServer,
+    #[cfg_attr(feature = "serde_support", serde(rename = "established"))]
+    Established,
+    #[cfg_attr(feature = "serde_support", serde(rename = "not_established"))]
+    NotEstablished,
+    #[cfg_attr(feature = "serde_support", serde(rename = "stateless"))]
+    Stateless,
+    #[cfg_attr(feature = "serde_support", serde(rename = "only_stream"))]
+    OnlyStream,
+    #[cfg_attr(feature = "serde_support", serde(rename = "no_stream"))]
+    NoStream,
+    #[cfg_attr(feature = "serde_support", serde(rename = "only_frag"))]
+    OnlyFrag,
+    #[cfg_attr(feature = "serde_support", serde(rename = "no_frag"))]
+    NoFrag,
+}
+
+impl Flow {
+    pub fn to_str(&self) -> &str {
+        match self {
+            Self::ToClient => "to_client",
+            Self::ToServer => "to_server",
+            Self::FromClient => "from_client",
+            Self::FromServer => "from_server",
+            Self::Established => "established",
+            Self::NotEstablished => "not_established",
+            Self::Stateless => "stateless",
+            Self::OnlyStream => "only_stream",
+            Self::NoStream => "no_stream",
+            Self::OnlyFrag => "only_frag",
+            Self::NoFrag => "no_frag",
+        }
+    }
+}
+
+impl FromStr for Flow {
+    type Err = nom::Err<RuleParseError<&'static str>>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let v = match s {
+            "to_client" => Self::ToClient,
+            "to_server" => Self::ToServer,
+            "from_client" => Self::FromClient,
+            "from_server" => Self::FromServer,
+            "established" => Self::Established,
+            "not_established" => Self::NotEstablished,
+            "stateless" => Self::Stateless,
+            "only_stream" => Self::OnlyStream,
+            "no_stream" => Self::NoStream,
+            "only_frag" => Self::OnlyStream,
+            "no_frag" => Self::NoFrag,
+            _ => {
+                return Err(nom::Err::Error(RuleParseError::UnknownFlowOption(
+                    s.to_string(),
+                )));
+            }
+        };
+        Ok(v)
     }
 }

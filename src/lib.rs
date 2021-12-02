@@ -47,6 +47,7 @@ pub enum RuleParseError<I> {
     InvalidByteJump(String),
     IntegerParseError(String),
     Flowbit(String),
+    UnknownFlowOption(String),
 
     // Other...
     Other(String),
@@ -99,7 +100,7 @@ pub enum Element {
     EndsWith(bool),
     FastPattern(bool),
     FileData(FileData),
-    Flow(String),
+    Flow(Vec<types::Flow>),
     Flowbits(Flowbits),
     FtpBounce(bool),
     IsDataAt(String),
@@ -193,7 +194,7 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
             }
             "within" => Element::Within(types::Within(parsers::parse_count_or_name(value)?.1)),
             "dsize" => Element::Dsize(value.to_owned()),
-            "flow" => Element::Flow(value.to_owned()),
+            "flow" => Element::Flow(parsers::parse_flow(value)?.1),
             "flowbits" => Element::Flowbits(parsers::parse_flowbits(value)?.1),
             "isdataat" => Element::IsDataAt(value.to_owned()),
             "metadata" => Element::Metadata(value.to_owned()),
