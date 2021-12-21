@@ -25,6 +25,7 @@ pub mod parsers;
 pub mod types;
 pub mod util;
 
+use crate::parsers::parse_metadata;
 use nom::bytes::complete::tag;
 use nom::character::complete::multispace0;
 use nom::error::ErrorKind;
@@ -105,7 +106,7 @@ pub enum Element {
     FtpBounce(bool),
     IsDataAt(String),
     Message(String),
-    Metadata(String),
+    Metadata(Vec<String>),
     NoAlert(bool),
     NoCase(bool),
     Offset(u64),
@@ -198,7 +199,7 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
             "flow" => Element::Flow(parsers::parse_flow(value)?.1),
             "flowbits" => Element::Flowbits(parsers::parse_flowbits(value)?.1),
             "isdataat" => Element::IsDataAt(value.to_owned()),
-            "metadata" => Element::Metadata(value.to_owned()),
+            "metadata" => Element::Metadata(parse_metadata(value)?.1),
             "msg" => Element::Message(util::strip_quotes(value)),
             "offset" => Element::Offset(parsers::parse_u64(value, "offset")?.1),
             "pcre" => Element::Pcre(value.to_owned()),

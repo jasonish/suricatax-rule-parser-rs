@@ -24,12 +24,12 @@ use crate::types;
 use crate::types::*;
 use crate::RuleParseError;
 use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag};
+use nom::bytes::complete::{is_not, tag, take_while};
 use nom::character::complete::{alphanumeric1, multispace0, multispace1};
 use nom::combinator::{eof, opt, rest};
 use nom::error::ErrorKind;
 use nom::multi::separated_list0;
-use nom::sequence::{preceded, tuple};
+use nom::sequence::{preceded, terminated, tuple};
 use nom::Err::Error;
 use nom::IResult;
 use std::str::FromStr;
@@ -303,9 +303,42 @@ pub(crate) fn parse_flow(input: &str) -> IResult<&str, Vec<Flow>, RuleParseError
     Ok((input, options))
 }
 
+/// Parse the metadata into a list of the comma separated values.
+pub(crate) fn parse_metadata(input: &str) -> IResult<&str, Vec<String>, RuleParseError<&str>> {
+    let sep = terminated(multispace0, preceded(multispace0, tag(",")));
+    let (input, parts) = separated_list0(
+        sep,
+        preceded(multispace0, take_while(|c| c != ',' && c != ';')),
+    )(input)?;
+    let parts: Vec<String> = parts.iter().map(|p| p.trim().to_string()).collect();
+    Ok((input, parts))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_parse_metadata() {
+        let (_, metadata) = parse_metadata("oneword").unwrap();
+        assert_eq!(&metadata, &["oneword"]);
+
+        let (_, metadata) = parse_metadata("one,two").unwrap();
+        assert_eq!(&metadata, &["one", "two"]);
+
+        let (_, metadata) = parse_metadata("one ,two").unwrap();
+        assert_eq!(&metadata, &["one", "two"]);
+
+        let (_, metadata) = parse_metadata("one , two").unwrap();
+        assert_eq!(&metadata, &["one", "two"]);
+
+        let (_, metadata) = parse_metadata("key val , key val").unwrap();
+        assert_eq!(&metadata, &["key val", "key val"]);
+
+        let (rem, metadata) = parse_metadata("key val , key val;").unwrap();
+        assert_eq!(&metadata, &["key val", "key val"]);
+        assert_eq!(rem, ";");
+    }
 
     #[test]
     fn test_parse_flow() {
