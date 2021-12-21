@@ -191,6 +191,23 @@ impl FromStr for FlowbitCommand {
     }
 }
 
+/// Xbits.
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
+#[repr(C)]
+pub struct XBits {
+    pub command: XbitCommand,
+    pub name: String,
+    pub track: String,
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub expire: Option<u64>,
+}
+
+pub type XbitCommand = FlowbitCommand;
+
 /// Within modifier type.
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 #[derive(PartialEq, Default, Debug, Clone)]

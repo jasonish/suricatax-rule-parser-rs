@@ -116,6 +116,7 @@ pub enum Element {
     Sid(u64),
     StartsWith(bool),
     Within(Within),
+    Xbits(XBits),
 
     // A generic option, used for unknown rule options.
     GenericOption(GenericOption),
@@ -204,6 +205,7 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
             "reference" => Element::Reference(value.to_owned()),
             "rev" => Element::Rev(parsers::parse_u64(value, "rev")?.1),
             "sid" => Element::Sid(parsers::parse_u64(value, "sid")?.1),
+            "xbits" => Element::Xbits(parsers::parse_xbits(value)?.1),
             _ => Element::GenericOption(GenericOption {
                 name: name.to_string(),
                 val: Some(value.to_string()),
