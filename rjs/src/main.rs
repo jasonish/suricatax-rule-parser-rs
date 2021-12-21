@@ -71,8 +71,8 @@ struct Rule {
     revision: u64,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     reference: Vec<String>,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    metadata: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    metadata: Vec<String>,
 
     options: Vec<Element>,
 }
@@ -118,12 +118,11 @@ impl From<Vec<Element>> for Rule {
                 Element::Reference(reference) => {
                     rule.reference.push(reference);
                 }
-                Element::Metadata(metadata) => {
+                Element::Metadata(mut metadata) => {
                     if rule.metadata.is_empty() {
                         rule.metadata = metadata;
                     } else {
-                        rule.metadata.push_str(", ");
-                        rule.metadata.push_str(&metadata);
+                        rule.metadata.append(&mut metadata);
                     }
                 }
                 _ => {
