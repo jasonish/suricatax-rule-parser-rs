@@ -25,8 +25,8 @@ use crate::types::*;
 use crate::RuleParseError;
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag};
-use nom::character::complete::{alphanumeric1, multispace0};
-use nom::combinator::{opt, rest};
+use nom::character::complete::{alphanumeric1, multispace0, multispace1};
+use nom::combinator::{eof, opt, rest};
 use nom::error::ErrorKind;
 use nom::multi::separated_list0;
 use nom::sequence::{preceded, tuple};
@@ -38,7 +38,7 @@ static WHITESPACE: &str = " \t\r\n";
 
 //
 // Utility parsers.
-///
+//
 
 /// Parse all characters up until the next whitespace character.
 pub(crate) fn take_until_whitespace(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
@@ -253,6 +253,47 @@ pub(crate) fn parse_flowbits(input: &str) -> IResult<&str, Flowbits, RuleParseEr
     }
 }
 
+pub(crate) fn parse_xbits(input: &str) -> IResult<&str, XBits, RuleParseError<&str>> {
+    let (input, command) = preceded(multispace0, alphanumeric1)(input)?;
+    let command = XbitCommand::from_str(command)?;
+    let (input, _) = preceded(multispace0, tag(","))(input)?;
+    let (input, name) = preceded(multispace0, is_not(","))(input)?;
+    let (input, _) = preceded(multispace0, tag(","))(input)?;
+    let track_parser = preceded(multispace0, tuple((tag("track"), multispace0, is_not(","))));
+    let (input, (_, _, track)) = preceded(multispace0, track_parser)(input)?;
+
+    fn parse_expire(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
+        let (input, _) = preceded(multispace0, tag(","))(input)?;
+        let (input, _) = multispace0(input)?;
+        let (input, _) = tag("expire")(input)?;
+        let (input, _) = multispace1(input)?;
+        let (input, expires) = alphanumeric1(input)?;
+        Ok((input, expires))
+    }
+
+    let end = preceded(multispace0, alt((eof, tag(";"))));
+    let (input, expire) = alt((parse_expire, end))(input)?;
+    let expire = if expire.is_empty() {
+        None
+    } else {
+        let expire: u64 = expire
+            .parse()
+            .map_err(|_| Error(RuleParseError::Other("invalid expire".to_string())))?;
+        Some(expire)
+    };
+    let (input, _) = preceded(multispace0, alt((eof, tag(";"))))(input)?;
+
+    Ok((
+        input,
+        XBits {
+            command,
+            name: name.trim().to_string(),
+            track: track.trim().to_string(),
+            expire,
+        },
+    ))
+}
+
 pub(crate) fn parse_flow(input: &str) -> IResult<&str, Vec<Flow>, RuleParseError<&str>> {
     let (input, values) = separated_list0(tag(","), preceded(multispace0, is_not(",")))(input)?;
     let mut options = vec![];
@@ -282,5 +323,56 @@ mod test {
 
         let flow = parse_flow(" to_client  ,    established   ").unwrap();
         assert_eq!(flow.1, vec![Flow::ToClient, Flow::Established]);
+    }
+
+    #[test]
+    fn test_parse_xbits() {
+        let (_, xbits) = parse_xbits("set,ET.dropsite,track ip_src").unwrap();
+        assert_eq!(
+            xbits,
+            XBits {
+                command: XbitCommand::Set,
+                name: "ET.dropsite".to_string(),
+                track: "ip_src".to_string(),
+                expire: None,
+            }
+        );
+
+        let (_, xbits) = parse_xbits("set  ,  ET.dropsite  ,  track ip_src").unwrap();
+        assert_eq!(
+            xbits,
+            XBits {
+                command: XbitCommand::Set,
+                name: "ET.dropsite".to_string(),
+                track: "ip_src".to_string(),
+                expire: None,
+            }
+        );
+
+        let (_, xbits) = parse_xbits("set,ET.dropsite,track ip_src,expire 5000").unwrap();
+        assert_eq!(
+            xbits,
+            XBits {
+                command: XbitCommand::Set,
+                name: "ET.dropsite".to_string(),
+                track: "ip_src".to_string(),
+                expire: Some(5000),
+            }
+        );
+
+        let (_, xbits) = parse_xbits("set,ET.dropsite,track ip_src  , expire 5000  ").unwrap();
+        assert_eq!(
+            xbits,
+            XBits {
+                command: XbitCommand::Set,
+                name: "ET.dropsite".to_string(),
+                track: "ip_src".to_string(),
+                expire: Some(5000),
+            }
+        );
+
+        assert!(parse_xbits("set,ET.dropsite,track ip_src,a").is_err());
+        assert!(parse_xbits("set,ET.dropsite,track ip_src, expire a").is_err());
+        assert!(parse_xbits("set,ET.dropsite,track ip_src, expire 5000 a").is_err());
     }
 }
