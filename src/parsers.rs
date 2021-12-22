@@ -24,7 +24,7 @@ use crate::types;
 use crate::types::*;
 use crate::RuleParseError;
 use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag, take_while};
+use nom::bytes::complete::{is_not, tag, take_until, take_while};
 use nom::character::complete::{alphanumeric1, multispace0, multispace1};
 use nom::combinator::{eof, opt, rest};
 use nom::error::ErrorKind;
@@ -314,9 +314,140 @@ pub(crate) fn parse_metadata(input: &str) -> IResult<&str, Vec<String>, RulePars
     Ok((input, parts))
 }
 
+pub(crate) fn parse_pcre(input: &str) -> IResult<&str, Pcre, RuleParseError<&str>> {
+    let (input, negate) = opt(tag("!"))(input)?;
+    let (input, _open_quote) = tag("\"")(input)?;
+    let (input, _open_pcre) = tag("/")(input)?;
+    let pattern_end = input.rfind('/').ok_or_else(|| {
+        nom::Err::Error(RuleParseError::Other("pcre: no terminating /".to_string()))
+    })?;
+    let pattern = &input[0..pattern_end];
+    let input = &input[pattern_end..];
+    let (input, _close_re) = tag("/")(input)?;
+
+    // Return what we have if we're at the end of the quoted section.
+    if let Ok((input, _)) = parse_end_quote(input) {
+        let pcre = Pcre {
+            negate: negate.is_some(),
+            pattern: pattern.to_string(),
+            modifiers: "".to_string(),
+            vars: vec![],
+        };
+        return Ok((input, pcre));
+    }
+
+    // Now parse the modifiers.
+    let (input, modifiers) = alphanumeric1(input)?;
+
+    // There might also be some variable captures.
+    let parse_start_of_vars = preceded(multispace0, tag(","));
+    let parse_vars = preceded(parse_start_of_vars, take_until("\""));
+    let (input, vars) = opt(parse_vars)(input)?;
+    let (input, _) = parse_end_quote(input)?;
+
+    let vars: Vec<String> = if let Some(vars) = vars {
+        vars.split(',').map(|s| s.trim().to_string()).collect()
+    } else {
+        vec![]
+    };
+
+    let pcre = Pcre {
+        negate: negate.is_some(),
+        pattern: pattern.to_string(),
+        modifiers: modifiers.to_string(),
+        vars,
+    };
+    Ok((input, pcre))
+}
+
+/// Parse an end quote. Probably not the best name for thie parser but it parses up to and
+/// including a quote that is only prefixed by optional whitespace.
+fn parse_end_quote(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
+    preceded(multispace0, tag("\""))(input)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_parse_pcre() {
+        let input0 = r#""/[0-9]{6}/""#;
+        let (rem, pcre) = parse_pcre(input0).unwrap();
+        assert_eq!(rem, "");
+        assert_eq!(
+            pcre,
+            Pcre {
+                negate: false,
+                pattern: r#"[0-9]{6}"#.to_string(),
+                modifiers: "".to_string(),
+                vars: vec![],
+            }
+        );
+
+        let input0 = r#""/[0-9]{6}/UR""#;
+        let (rem, pcre) = parse_pcre(input0).unwrap();
+        assert_eq!(rem, "");
+        assert_eq!(
+            pcre,
+            Pcre {
+                negate: false,
+                pattern: r#"[0-9]{6}"#.to_string(),
+                modifiers: "UR".to_string(),
+                vars: vec![],
+            }
+        );
+
+        let input0 = "\"/([^:/$]+)/R,flow:rce_server\"";
+        let (_, pcre) = parse_pcre(input0).unwrap();
+        assert_eq!(
+            pcre,
+            Pcre {
+                negate: false,
+                pattern: r#"([^:/$]+)"#.to_string(),
+                modifiers: "R".to_string(),
+                vars: vec!["flow:rce_server".to_string()],
+            }
+        );
+
+        let input0 = "\"/([^:/$]+)/Ri, flow:rce_server\"";
+        let (_, pcre) = parse_pcre(input0).unwrap();
+        assert_eq!(
+            pcre,
+            Pcre {
+                negate: false,
+                pattern: r#"([^:/$]+)"#.to_string(),
+                modifiers: "Ri".to_string(),
+                vars: vec!["flow:rce_server".to_string()],
+            }
+        );
+
+        let input0 = r#""/\/winhost(?:32|64)\.(exe|pack)$/i""#;
+        let (_, pcre) = parse_pcre(input0).unwrap();
+        assert_eq!(
+            pcre,
+            Pcre {
+                negate: false,
+                pattern: r#"\/winhost(?:32|64)\.(exe|pack)$"#.to_string(),
+                modifiers: "i".to_string(),
+                vars: vec![],
+            }
+        );
+
+        let input0 = r#""/\/(?=[0-9]*?[a-z]*?[a-z0-9)(?=[a-z0-9]*[0-9][a-z]*[0-9][a-z0-9]*\.exe)(?!setup\d+\.exe)[a-z0-9]{5,15}\.exe/""#;
+        let (_, _pcre) = parse_pcre(input0).unwrap();
+
+        let input0 = r#""/passwd/main\x2Ephp\x3F[^\x0A\x0D]*backend\x3D[^\x0A\x0D\x26]*\x22/i""#;
+        let (_, _pcre) = parse_pcre(input0).unwrap();
+
+        let input0 = r#""/^(?:d(?:(?:ocu|uco)sign|ropbox)|o(?:ffice365|nedrive)|adobe|gdoc)/""#;
+        let (_, _pcre) = parse_pcre(input0).unwrap();
+
+        let input0 = r#"!"/^onedrivecl[a-z]{2}prod[a-z]{2}[0-9]{5}\./""#;
+        let (_, pcre) = parse_pcre(input0).unwrap();
+        assert_eq!(rem, "");
+        assert_eq!(pcre.negate, true);
+    }
 
     #[test]
     fn test_parse_metadata() {

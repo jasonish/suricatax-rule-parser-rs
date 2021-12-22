@@ -49,6 +49,7 @@ pub enum RuleParseError<I> {
     IntegerParseError(String),
     Flowbit(String),
     UnknownFlowOption(String),
+    Pcre(String),
 
     // Other...
     Other(String),
@@ -110,7 +111,7 @@ pub enum Element {
     NoAlert(bool),
     NoCase(bool),
     Offset(u64),
-    Pcre(String),
+    Pcre(Pcre),
     RawBytes(bool),
     Reference(String),
     Rev(u64),
@@ -202,7 +203,11 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
             "metadata" => Element::Metadata(parse_metadata(value)?.1),
             "msg" => Element::Message(util::strip_quotes(value)),
             "offset" => Element::Offset(parsers::parse_u64(value, "offset")?.1),
-            "pcre" => Element::Pcre(value.to_owned()),
+            "pcre" => Element::Pcre(
+                parsers::parse_pcre(value)
+                    .map_err(|err| nom::Err::Error(RuleParseError::Pcre(format!("{}", err))))?
+                    .1,
+            ),
             "reference" => Element::Reference(value.to_owned()),
             "rev" => Element::Rev(parsers::parse_u64(value, "rev")?.1),
             "sid" => Element::Sid(parsers::parse_u64(value, "sid")?.1),
