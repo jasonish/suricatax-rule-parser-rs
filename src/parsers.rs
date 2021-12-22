@@ -316,7 +316,7 @@ pub(crate) fn parse_metadata(input: &str) -> IResult<&str, Vec<String>, RulePars
 
 pub(crate) fn parse_pcre(input: &str) -> IResult<&str, Pcre, RuleParseError<&str>> {
     let (input, negate) = opt(tag("!"))(input)?;
-    let (input, _open_quote) = tag("\"")(input)?;
+    let (input, _open_quote) = preceded(multispace0, tag("\""))(input)?;
     let (input, _open_pcre) = tag("/")(input)?;
     let pattern_end = input.rfind('/').ok_or_else(|| {
         nom::Err::Error(RuleParseError::Other("pcre: no terminating /".to_string()))
@@ -447,6 +447,15 @@ mod test {
         let (_, pcre) = parse_pcre(input0).unwrap();
         assert_eq!(rem, "");
         assert_eq!(pcre.negate, true);
+
+        let input0 = r#"! "/^\w+\s+\w+:\/\/([^\/\s:#]+)[\/\s:#]\S*.+?Host:[ \t]*\1\S*\b/is""#;
+        let (rem, pcre) = parse_pcre(input0).unwrap();
+        assert_eq!(rem, "");
+        assert_eq!(pcre.modifiers, "is");
+        assert_eq!(
+            pcre.pattern,
+            r#"^\w+\s+\w+:\/\/([^\/\s:#]+)[\/\s:#]\S*.+?Host:[ \t]*\1\S*\b"#
+        );
     }
 
     #[test]
