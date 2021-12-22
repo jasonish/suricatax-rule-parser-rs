@@ -213,6 +213,26 @@ pub type XbitCommand = FlowbitCommand;
 #[derive(PartialEq, Default, Debug, Clone)]
 pub struct Within(pub CountOrName);
 
+/// Pcre.
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
+#[repr(C)]
+pub struct Pcre {
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
+    pub negate: bool,
+    pub pattern: String,
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(skip_serializing_if = "String::is_empty")
+    )]
+    pub modifiers: String,
+    #[cfg_attr(
+        feature = "serde_support",
+        serde(skip_serializing_if = "Vec::is_empty")
+    )]
+    pub vars: Vec<String>,
+}
+
 //
 // Helper types.
 //
