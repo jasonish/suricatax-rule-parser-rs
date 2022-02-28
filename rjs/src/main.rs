@@ -74,6 +74,9 @@ struct Rule {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     metadata: Vec<String>,
 
+    #[serde(skip_serializing_if = "is_false")]
+    noalert: bool,
+
     options: Vec<Element>,
 }
 
@@ -124,6 +127,9 @@ impl From<Vec<Element>> for Rule {
                     } else {
                         rule.metadata.append(&mut metadata);
                     }
+                }
+                Element::NoAlert(_) => {
+                    rule.noalert = true;
                 }
                 _ => {
                     rule.options.push(element);
@@ -231,4 +237,8 @@ fn next_line<T: BufRead>(reader: &mut Lines<T>) -> Result<Option<String>, std::i
         }
     }
     Ok(None)
+}
+
+fn is_false(v: &bool) -> bool {
+    *v == false
 }
