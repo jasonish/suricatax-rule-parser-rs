@@ -544,8 +544,24 @@ mod test {
             }
         );
 
+        // Test some invalid input.
         assert!(parse_xbits("set,ET.dropsite,track ip_src,a").is_err());
         assert!(parse_xbits("set,ET.dropsite,track ip_src, expire a").is_err());
         assert!(parse_xbits("set,ET.dropsite,track ip_src, expire 5000 a").is_err());
+    }
+
+    #[test]
+    pub fn test_parse_flowbits() {
+        assert!(parse_flowbits("set,foo.bar").is_ok());
+        assert!(parse_flowbits("set,foo | bar").is_ok());
+        assert!(parse_flowbits("noalert").is_ok());
+
+        let (_, flowbits) = parse_flowbits("set,myflow2").unwrap();
+        assert_eq!(flowbits.command, FlowbitCommand::Set);
+        assert_eq!(flowbits.names, vec!["myflow2"]);
+
+        let (_, flowbits) = parse_flowbits("toggle, myflow2").unwrap();
+        assert_eq!(flowbits.command, FlowbitCommand::Toggle);
+        assert_eq!(flowbits.names, vec!["myflow2"]);
     }
 }

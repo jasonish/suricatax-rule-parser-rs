@@ -120,6 +120,12 @@ pub enum Element {
     Within(Within),
     Xbits(XBits),
 
+    /// The name of a sticky buffer, or perhaps an unqualified frame name.
+    Buffer(String),
+
+    /// The name of a modifier.
+    Modifier(String),
+
     // A generic option, used for unknown rule options.
     GenericOption(GenericOption),
 }
@@ -165,6 +171,66 @@ pub(crate) fn parse_option_value(input: &str) -> IResult<&str, &str, RuleParseEr
     }
 }
 
+const BUFFER_NAMES: &[&str] = &[
+    "dns.query",
+    "dns_query",
+    "http.content_type",
+    "http.header_names",
+    "http.header.raw",
+    "http.header",
+    "http.host",
+    "http.method",
+    "http.request_body",
+    "http.request_line",
+    "http.start",
+    "http.stat_code",
+    "http.uri",
+    "http.user_agent",
+    "http.referer",
+    "file.data",
+    "http.cookie",
+    "http.uri.raw",
+    "http.response_body",
+    "http.response_line",
+    "http.server",
+    "http.host.raw",
+    "http.protocol",
+    "http.connection",
+    "http.accept",
+    "http.stat_msg",
+    "http.content_len",
+    "http.accept_lang",
+    "http.accept_enc",
+    "http.location",
+    "tls.cert_subject",
+    "tls.sni",
+    "tls.cert_issuer",
+    "base64_data",
+    "pkt_data",
+    "tls_cert_issuer",
+    "ja3.hash",
+    "ja3s.hash",
+    "ja3.string",
+    "ja3_hash",
+    "tls.cert_serial",
+    "http_header_names",
+    "tls_sni",
+    "tls.cert_fingerprint",
+    "ssh.proto",
+    "ssh_proto",
+];
+
+const MODIFIER_NAMES: &[&str] = &[
+    "http_header",
+    "http_method",
+    "http_uri",
+    "dotprefix",
+    "http_client_body",
+    "http_user_agent",
+    "http_stat_code",
+    "http_host",
+];
+
 pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RuleParseError<&str>> {
     // First get the option name.
     let (input, name) = preceded(multispace0, nom::bytes::complete::is_not(";:"))(input)?;
@@ -179,10 +245,22 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
             "nocase" => Element::NoCase(true),
             "rawbytes" => Element::RawBytes(true),
             "startswith" => Element::StartsWith(true),
-            _ => Element::GenericOption(GenericOption {
-                name: name.to_string(),
-                val: None,
-            }),
+            _ => {
+                if BUFFER_NAMES.contains(&(name.to_lowercase().as_ref())) {
+                    Element::Buffer(name.to_string())
+                } else if MODIFIER_NAMES.contains(&name) {
+                    Element::Modifier(name.to_string())
+                } else {
+                    let strict = true;
+                    if strict {
+                        panic!("unknown option: {}", name);
+                    }
+                    Element::GenericOption(GenericOption {
+                        name: name.to_string(),
+                        val: None,
+                    })
+                }
+            }
         };
         Ok((input, option))
     } else {
@@ -221,10 +299,10 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
     }
 }
 
-/// Parse a rule into individual element.
+/// Parse a rule into individual elements.
 ///
 /// For the header, each item like action, source address, etc is considered
-/// elemenent. For rule options, the parsed option is an element.
+/// an element. For rule options, the parsed option is an element.
 ///
 /// The result is a vector of parsed elements in the same order as found in the
 /// original rule.
@@ -395,13 +473,6 @@ pub fn reduce_elements(
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    pub fn test_parse_flowbits() {
-        let (_, _flowbits) = parsers::parse_flowbits("set,foo.bar").unwrap();
-        let (_, _flowbits) = parsers::parse_flowbits("set,foo | bar").unwrap();
-        let (_, _flowbits) = parsers::parse_flowbits("noalert").unwrap();
-    }
 
     #[test]
     fn test_parse_direction() {
