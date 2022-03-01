@@ -73,7 +73,8 @@ pub struct ByteJump {
 pub struct Content {
     pub pattern: String,
 
-    // Modifiers.
+    // Modifiers that can exist once per content and make sense to pull into the
+    // context object.
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
     pub depth: u64,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
@@ -191,10 +192,22 @@ impl FromStr for FlowbitCommand {
     }
 }
 
+/// IsDataAt (isdataat)
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
+pub struct IsDataAt {
+    pub position: u16,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
+    pub negate: bool,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
+    pub relative: bool,
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
+    pub rawbytes: bool,
+}
+
 /// Xbits.
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
-#[repr(C)]
 pub struct XBits {
     pub command: XbitCommand,
     pub name: String,

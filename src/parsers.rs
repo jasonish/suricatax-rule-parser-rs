@@ -25,6 +25,7 @@ use crate::types::*;
 use crate::RuleParseError;
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until, take_while};
+use nom::character::complete::digit1;
 use nom::character::complete::{alphanumeric1, multispace0, multispace1};
 use nom::combinator::{eof, opt, rest};
 use nom::error::ErrorKind;
@@ -57,6 +58,14 @@ pub(crate) fn parse_u64<'a>(
         )))
     })?;
     Ok((input, val))
+}
+
+/// Parses the next numeric value ignoring any leading whitespace and finishing
+/// at a set of known terminators.
+fn parse_digits(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
+    let number = preceded(multispace0, digit1);
+    let terminator = alt((eof, tag(","), tag(";"), tag(" ")));
+    terminated(number, terminator)(input)
 }
 
 /// Parse a list like an address or port list.
@@ -251,6 +260,44 @@ pub(crate) fn parse_flowbits(input: &str) -> IResult<&str, Flowbits, RuleParseEr
             }
         }
     }
+}
+
+pub(crate) fn parse_isdataat(input: &str) -> IResult<&str, IsDataAt, RuleParseError<&str>> {
+    // Look for a possible negation flag.
+    let (input, negate) = preceded(multispace0, opt(tag("!")))(input)?;
+    let (input, position) = parse_digits(input)?;
+    let position: u16 = position
+        .parse()
+        .map_err(|_| Error(RuleParseError::Other("invalid position value".to_string())))?;
+    let mut relative = false;
+    let mut rawbytes = false;
+
+    for option in input.split(',').map(|s| s.trim()) {
+        match option {
+            "relative" => {
+                relative = true;
+            }
+            "rawbytes" => {
+                rawbytes = true;
+            }
+            "" => {}
+            _ => {
+                return Err(Error(RuleParseError::Other(format!(
+                    "invalid isdataat option: {}",
+                    option
+                ))));
+            }
+        }
+    }
+    Ok((
+        "",
+        IsDataAt {
+            negate: negate.is_some(),
+            position,
+            relative,
+            rawbytes,
+        },
+    ))
 }
 
 pub(crate) fn parse_xbits(input: &str) -> IResult<&str, XBits, RuleParseError<&str>> {
@@ -563,5 +610,73 @@ mod test {
         let (_, flowbits) = parse_flowbits("toggle, myflow2").unwrap();
         assert_eq!(flowbits.command, FlowbitCommand::Toggle);
         assert_eq!(flowbits.names, vec!["myflow2"]);
+    }
+
+    #[test]
+    fn test_parse_number() {
+        let (_, number) = parse_digits("123").unwrap();
+        assert_eq!(number, "123");
+        assert!(parse_digits("123a").is_err());
+        assert!(parse_digits("a").is_err());
+    }
+
+    #[test]
+    fn test_parse_isdataat() {
+        let (_, isdataat) = parse_isdataat("100").unwrap();
+        assert_eq!(
+            isdataat,
+            IsDataAt {
+                position: 100,
+                negate: false,
+                relative: false,
+                rawbytes: false,
+            }
+        );
+
+        let (_, isdataat) = parse_isdataat("!100").unwrap();
+        assert_eq!(
+            isdataat,
+            IsDataAt {
+                position: 100,
+                negate: true,
+                relative: false,
+                rawbytes: false,
+            }
+        );
+
+        let (_, isdataat) = parse_isdataat("!100,relative").unwrap();
+        assert_eq!(
+            isdataat,
+            IsDataAt {
+                position: 100,
+                negate: true,
+                relative: true,
+                rawbytes: false,
+            }
+        );
+
+        let (_, isdataat) = parse_isdataat("!100,rawbytes").unwrap();
+        assert_eq!(
+            isdataat,
+            IsDataAt {
+                position: 100,
+                negate: true,
+                relative: false,
+                rawbytes: true,
+            }
+        );
+
+        let (_, isdataat) = parse_isdataat("!100, relative, rawbytes").unwrap();
+        assert_eq!(
+            isdataat,
+            IsDataAt {
+                position: 100,
+                negate: true,
+                relative: true,
+                rawbytes: true,
+            }
+        );
+
+        assert!(parse_isdataat("!100, absolute").is_err());
     }
 }
