@@ -73,6 +73,9 @@ pub struct ByteJump {
 pub struct Content {
     pub pattern: String,
 
+    #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
+    pub negate: bool,
+
     // Modifiers that can exist once per content and make sense to pull into the
     // context object.
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]

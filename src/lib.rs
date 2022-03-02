@@ -268,7 +268,7 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
         let option = match name {
             "byte_jump" => Element::ByteJump(parsers::parse_byte_jump(value)?.1),
             "classtype" => Element::Classtype(value.to_owned()),
-            "content" => Element::Content(types::Content::new(value.to_owned())),
+            "content" => Element::Content(parsers::parse_content(value)?.1),
             "depth" => Element::Depth(parsers::parse_u64(value, "depth")?.1),
             "distance" => {
                 Element::Distance(types::Distance(parsers::parse_count_or_name(value)?.1))

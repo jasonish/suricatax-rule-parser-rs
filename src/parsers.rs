@@ -24,12 +24,17 @@ use crate::types;
 use crate::types::*;
 use crate::RuleParseError;
 use nom::branch::alt;
+use nom::bytes::complete::escaped_transform;
 use nom::bytes::complete::{is_not, tag, take_until, take_while};
 use nom::character::complete::digit1;
+use nom::character::complete::none_of;
+use nom::character::complete::one_of;
 use nom::character::complete::{alphanumeric1, multispace0, multispace1};
+use nom::combinator::map;
 use nom::combinator::{eof, opt, rest};
 use nom::error::ErrorKind;
 use nom::multi::separated_list0;
+use nom::sequence::delimited;
 use nom::sequence::{preceded, terminated, tuple};
 use nom::Err::Error;
 use nom::IResult;
@@ -100,9 +105,41 @@ pub(crate) fn parse_list(input: &str) -> IResult<&str, &str, RuleParseError<&str
     Ok((&input[end + 1..], &input[0..end + 1]))
 }
 
+/// Parse a quote string as often seen in Suricata rules.
+///
+/// This handles escaped quotes and semicolons (however semicolons do not need
+/// to be escaped like most parsers enforce).
+///
+/// The input string must start with a quote and will parse up to the next
+/// unescaped quote.
+///
+/// The return value is a String with escapes removed and no leading or trailing
+/// double quotes.
+fn parse_quoted_string(input: &str) -> IResult<&str, String, RuleParseError<&str>> {
+    let escaped_parser = escaped_transform(none_of("\\\""), '\\', one_of("\"\\;"));
+    let empty = map(tag(""), |s: &str| s.to_string());
+    let escaped_or_empty = alt((escaped_parser, empty));
+    delimited(tag("\""), escaped_or_empty, tag("\""))(input)
+}
+
 //
 // Element parsers.
 //
+// Try to keep in alphabetical order.
+//
+
+pub fn parse_content(input: &str) -> IResult<&str, types::Content, RuleParseError<&str>> {
+    let (input, negate) = preceded(multispace0, opt(tag("!")))(input)?;
+    let (input, pattern) = parse_quoted_string(input)?;
+    Ok((
+        input,
+        types::Content {
+            pattern,
+            negate: negate.is_some(),
+            ..Default::default()
+        },
+    ))
+}
 
 pub(crate) fn parse_direction(
     input: &str,
@@ -678,5 +715,66 @@ mod test {
         );
 
         assert!(parse_isdataat("!100, absolute").is_err());
+    }
+
+    #[test]
+    fn test_parse_str() {
+        let (i, a) = parse_quoted_string(r#""""#).unwrap();
+        assert_eq!(i, "");
+        assert_eq!(a, "");
+
+        let (i, a) = parse_quoted_string(r#""simple string""#).unwrap();
+        assert_eq!(i, "");
+        assert_eq!(a, "simple string");
+
+        let (i, a) = parse_quoted_string(r#""with; semicolons.""#).unwrap();
+        assert_eq!(i, "");
+        assert_eq!(a, "with; semicolons.");
+
+        let (i, a) = parse_quoted_string(r#""with escaped\; semicolons.""#).unwrap();
+        assert_eq!(i, "");
+        assert_eq!(a, "with escaped; semicolons.");
+
+        let (i, a) =
+            parse_quoted_string(r#""with escaped\; semicolons and \" inner quote""#).unwrap();
+        assert_eq!(i, "");
+        assert_eq!(a, "with escaped; semicolons and \" inner quote");
+    }
+
+    #[test]
+    fn test_parse_content() {
+        let (i, content) = parse_content(r#""|be ef|""#).unwrap();
+        assert_eq!(
+            content,
+            types::Content {
+                pattern: "|be ef|".to_string(),
+                negate: false,
+                ..Default::default()
+            }
+        );
+        assert_eq!(i, "");
+
+        let (i, content) = parse_content(r#"!"|be ef|""#).unwrap();
+        assert_eq!(
+            content,
+            types::Content {
+                pattern: "|be ef|".to_string(),
+                negate: true,
+                ..Default::default()
+            }
+        );
+        assert_eq!(i, "");
+
+        // Snort 3 style...
+        let (i, content) = parse_content(r#"!"|be ef|", within 5"#).unwrap();
+        assert_eq!(
+            content,
+            types::Content {
+                pattern: "|be ef|".to_string(),
+                negate: true,
+                ..Default::default()
+            }
+        );
+        assert_eq!(i, ", within 5");
     }
 }
