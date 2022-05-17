@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+pub mod byte_math;
 pub mod ffi;
 pub mod parsers;
 pub mod types;
@@ -47,9 +48,17 @@ pub enum RuleParseError<I> {
     InvalidDirection(String),
     InvalidByteJump(String),
     IntegerParseError(String),
+    NumberParseError(String),
     Flowbit(String),
     UnknownFlowOption(String),
     Pcre(String),
+    BadByteMathOperator(String),
+    BadByteMathKeyword(String),
+    BadByteMathBitMask,
+    BadEndianValue(String),
+
+    // Generic error for when a keyword value is missing an option.
+    MissingOption(String),
 
     // Other...
     Other(String),
@@ -94,6 +103,7 @@ pub enum Element {
 
     // Body (option) elements.
     ByteJump(types::ByteJump),
+    ByteMath(byte_math::ByteMath),
     Classtype(String),
     Content(Content),
     Depth(u64),
@@ -251,7 +261,7 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
                 } else if MODIFIER_NAMES.contains(&name) {
                     Element::Modifier(name.to_string())
                 } else {
-                    let strict = true;
+                    let strict = false;
                     if strict {
                         panic!("unknown option: {}", name);
                     }

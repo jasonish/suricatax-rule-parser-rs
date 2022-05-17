@@ -1,4 +1,4 @@
-// Copyright 2021 Jason Ish
+// Copyright 2021-2022 Jason Ish
 //
 // MIT License.
 //
