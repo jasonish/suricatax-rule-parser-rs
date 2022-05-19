@@ -2,8 +2,8 @@
 //
 // Copyright (C) 2022 Jason Ish
 
-use crate::common::{parse_number, parse_tag, parse_token};
-use crate::RuleParseError;
+use crate::common::{parse_base, parse_number, parse_tag, parse_token};
+use crate::{Base, RuleParseError};
 use nom::Err::Error;
 use nom::IResult;
 use serde::Deserialize;
@@ -106,40 +106,6 @@ pub enum Rvalue {
     Name(String),
 }
 
-#[cfg_attr(
-    feature = "serde_support",
-    derive(Serialize, Deserialize),
-    serde(rename_all = "snake_case")
-)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum Base {
-    Dec,
-    Hex,
-    Oct,
-}
-
-impl Default for Base {
-    fn default() -> Self {
-        Self::Dec
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Base {
-    type Error = RuleParseError<&'a str>;
-
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let base = match value {
-            "dec" => Self::Dec,
-            "hex" => Self::Hex,
-            "oct" => Self::Oct,
-            _ => {
-                return Err(RuleParseError::Other(format!("invalid base: {}", value)));
-            }
-        };
-        Ok(base)
-    }
-}
-
 fn parse_op(input: &str) -> IResult<&str, ByteMathOperator, RuleParseError<&str>> {
     let (input, token) = parse_token(input)?;
     let op = ByteMathOperator::try_from(token).map_err(nom::Err::Error)?;
@@ -207,8 +173,8 @@ pub fn parse_byte_math(mut input: &str) -> IResult<&str, ByteMath, RuleParseErro
                 input = i;
             }
             "string" => {
-                let (i, v) = parse_token(input)?;
-                base = Base::try_from(v).map_err(nom::Err::Error)?;
+                let (i, v) = parse_base(input)?;
+                base = v;
                 input = i;
             }
             "bitmask" => {

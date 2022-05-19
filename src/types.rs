@@ -29,6 +29,18 @@ use serde::{Deserialize, Serialize};
 use crate::util::is_default;
 use crate::RuleParseError;
 
+/// A common type for values that take a name or a number as a value.
+#[cfg_attr(
+    feature = "serde_support",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "snake_case")
+)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum NumberOrName<T> {
+    Number(T),
+    Name(String),
+}
+
 /// Byte jump.
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -82,6 +94,41 @@ impl Default for ByteJumpOffset {
     fn default() -> Self {
         Self::Value(0)
     }
+}
+
+#[cfg_attr(
+    feature = "serde_support",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "snake_case")
+)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct ByteTest {
+    pub bytes: usize,
+    pub op: ByteTestOperator,
+    pub value: NumberOrName<u64>,
+    pub offset: NumberOrName<i32>,
+    pub relative: bool,
+    pub endian: Endian,
+    pub string: bool,
+    pub base: Base,
+    pub dce: bool,
+    pub bitmask: u32,
+}
+
+#[cfg_attr(
+    feature = "serde_support",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "snake_case")
+)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum ByteTestOperator {
+    Lt,
+    Gt,
+    Lte,
+    Gte,
+    Eq,
+    And,
+    Or,
 }
 
 /// Content type.
@@ -303,6 +350,24 @@ pub enum Endian {
 impl Default for Endian {
     fn default() -> Self {
         Self::Big
+    }
+}
+
+#[cfg_attr(
+    feature = "serde_support",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "snake_case")
+)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum Base {
+    Dec,
+    Hex,
+    Oct,
+}
+
+impl Default for Base {
+    fn default() -> Self {
+        Self::Dec
     }
 }
 

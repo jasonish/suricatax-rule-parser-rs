@@ -57,6 +57,8 @@ pub enum RuleParseError<I> {
     BadByteMathKeyword(String),
     BadByteMathBitMask,
     BadEndianValue(String),
+    BadBase(String),
+    UnknownOption(String),
 
     // Generic error for when a keyword value is missing an option.
     MissingOption(String),
@@ -112,6 +114,7 @@ pub enum Element {
     // Body (option) elements.
     ByteJump(types::ByteJump),
     ByteMath(byte_math::ByteMath),
+    ByteTest(ByteTest),
     Classtype(String),
     Content(Content),
     Depth(u64),
@@ -286,6 +289,7 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
         let option = match name {
             "byte_jump" => Element::ByteJump(parsers::parse_byte_jump(value)?.1),
             "byte_math" => Element::ByteMath(byte_math::parse_byte_math(value)?.1),
+            "byte_test" => Element::ByteTest(parsers::byte_test::parse_byte_test(value)?.1),
             "classtype" => Element::Classtype(value.to_owned()),
             "content" => Element::Content(parsers::parse_content(value)?.1),
             "depth" => Element::Depth(parsers::parse_u64(value, "depth")?.1),
