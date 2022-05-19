@@ -1,1 +1,6 @@
 alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE Win32.Kovter Client CnC Traffic"; flow:established,to_server; dsize:4<>256; content:!"HTTP"; content:"|00 00 00|"; offset:1; depth:3; pcre:"/^[\x11\x21-\x26\x41\x45\x70-\x79]/R"; content:!"|00 00|"; distance:0; byte_jump:1,0,from_beginning,post_offset 3; isdataat:!2,relative; pcre:!"/\x00$/"; reference:url,symantec.com/connect/blogs/kovter-malware-learns-poweliks-persistent-fileless-registry-update; classtype:command-and-control; sid:2022861; rev:1; metadata:created_at 2016_06_06, former_category MALWARE, updated_at 2016_06_06;)
+
+# The following 3 rules are from the Snort source for byte_math.
+alert tcp any any -> any any  (sid :1;byte_math:bytes 4,oper +,rvalue 123, offset 12,result var; msg: "Byte_math_valid";content : "|74 63 6c 61|";)
+alert tcp any any -> any any  (sid :1;byte_math:bytes 1,oper <<,rvalue 123, offset 12,result var; msg: "Byte_math_valid";content : "|74 63 6c 61|";)
+alert tcp any any -> any any (msg:"byte_math IT : byte_jump ####### CASE-5 # byte_math byte_extract and byte_jump with bitmask in each rule"; byte_math:oper /,rvalue 2, relative, result OFF1,offset 0, endian big,bytes 1,bitmask 0xA;byte_extract:1,1,OFF2,bitmask 0xA;byte_jump:1,OFF2,bitmask 0xA;byte_extract:1,3,VALUE,bitmask 0x5; byte_test:1,<,VALUE,OFF1,bitmask 0xCB;content:"SKIPME"; sid:2;)
