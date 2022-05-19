@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (C) 2022 Open Information Security Foundation
+// Copyright (C) 2022 Jason Ish
 
 use crate::common::{parse_number, parse_tag, parse_token};
 use crate::RuleParseError;

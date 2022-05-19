@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (C) 2022 Open Information Security Foundation
+// Copyright (C) 2022 Jason Ish
 
 /// Common helper parsers used by multiple keyword parsers.
 use crate::RuleParseError;

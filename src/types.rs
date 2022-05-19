@@ -35,7 +35,7 @@ use crate::RuleParseError;
 #[repr(C)]
 pub struct ByteJump {
     pub count: usize,
-    pub offset: i64,
+    pub offset: ByteJumpOffset,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
     pub relative: bool,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
@@ -65,6 +65,23 @@ pub struct ByteJump {
     pub dce: bool,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
     pub bitmask: u64,
+}
+
+#[cfg_attr(
+    feature = "serde_support",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "snake_case")
+)]
+#[derive(Clone, Debug, PartialEq)]
+pub enum ByteJumpOffset {
+    Value(i32),
+    Name(String),
+}
+
+impl Default for ByteJumpOffset {
+    fn default() -> Self {
+        Self::Value(0)
+    }
 }
 
 /// Content type.

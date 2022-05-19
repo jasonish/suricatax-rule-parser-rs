@@ -162,9 +162,11 @@ pub(crate) fn parse_byte_jump(input: &str) -> IResult<&str, types::ByteJump, Rul
         .parse()
         .map_err(|_| make_error(format!("invalid count: {}", values[0])))?;
 
-    byte_jump.offset = values[1]
-        .parse()
-        .map_err(|_| make_error(format!("invalid offset: {}", values[1])))?;
+    if let Ok(offset) = values[1].parse::<i32>() {
+        byte_jump.offset = ByteJumpOffset::Value(offset);
+    } else {
+        byte_jump.offset = ByteJumpOffset::Name(values[1].to_string());
+    }
 
     for value in &values[2..] {
         let (value, name) = take_until_whitespace(value)?;

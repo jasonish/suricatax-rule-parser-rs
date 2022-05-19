@@ -285,6 +285,7 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
         let (input, value) = parse_option_value(input)?;
         let option = match name {
             "byte_jump" => Element::ByteJump(parsers::parse_byte_jump(value)?.1),
+            "byte_math" => Element::ByteMath(byte_math::parse_byte_math(value)?.1),
             "classtype" => Element::Classtype(value.to_owned()),
             "content" => Element::Content(parsers::parse_content(value)?.1),
             "depth" => Element::Depth(parsers::parse_u64(value, "depth")?.1),
@@ -544,7 +545,7 @@ mod test {
         let input = "4,12,relative,little,multiplier 2";
         let (_, byte_jump) = parsers::parse_byte_jump(input).unwrap();
         assert_eq!(byte_jump.count, 4);
-        assert_eq!(byte_jump.offset, 12);
+        assert_eq!(byte_jump.offset, ByteJumpOffset::Value(12));
         assert_eq!(byte_jump.relative, true);
         assert_eq!(byte_jump.endian, types::Endian::Little);
         assert_eq!(byte_jump.multiplier, 2);
