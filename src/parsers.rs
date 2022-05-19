@@ -1,35 +1,17 @@
-// Copyright 2021 Jason Ish
+// SPDX-License-Identifier: MIT
 //
-// MIT License.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+// Copyright (C) 2021-2022 Jason Ish
 
+use crate::common::{parse_number, parse_tag, parse_token};
 use crate::types;
 use crate::types::*;
 use crate::RuleParseError;
 use nom::branch::alt;
 use nom::bytes::complete::escaped_transform;
 use nom::bytes::complete::{is_not, tag, take_until, take_while};
-use nom::character::complete::digit1;
 use nom::character::complete::none_of;
 use nom::character::complete::one_of;
-use nom::character::complete::{alphanumeric1, multispace0, multispace1};
+use nom::character::complete::{alphanumeric1, multispace0};
 use nom::combinator::map;
 use nom::combinator::{eof, opt, rest};
 use nom::error::ErrorKind;
@@ -63,14 +45,6 @@ pub(crate) fn parse_u64<'a>(
         )))
     })?;
     Ok((input, val))
-}
-
-/// Parses the next numeric value ignoring any leading whitespace and finishing
-/// at a set of known terminators.
-fn parse_digits(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
-    let number = preceded(multispace0, digit1);
-    let terminator = alt((eof, tag(","), tag(";"), tag(" ")));
-    terminated(number, terminator)(input)
 }
 
 /// Parse a list like an address or port list.
@@ -302,10 +276,7 @@ pub(crate) fn parse_flowbits(input: &str) -> IResult<&str, Flowbits, RuleParseEr
 pub(crate) fn parse_isdataat(input: &str) -> IResult<&str, IsDataAt, RuleParseError<&str>> {
     // Look for a possible negation flag.
     let (input, negate) = preceded(multispace0, opt(tag("!")))(input)?;
-    let (input, position) = parse_digits(input)?;
-    let position: u16 = position
-        .parse()
-        .map_err(|_| Error(RuleParseError::Other("invalid position value".to_string())))?;
+    let (input, position) = parse_number::<u16>(input)?;
     let mut relative = false;
     let mut rawbytes = false;
 
@@ -338,20 +309,18 @@ pub(crate) fn parse_isdataat(input: &str) -> IResult<&str, IsDataAt, RuleParseEr
 }
 
 pub(crate) fn parse_xbits(input: &str) -> IResult<&str, XBits, RuleParseError<&str>> {
-    let (input, command) = preceded(multispace0, alphanumeric1)(input)?;
+    let (input, command) = parse_token(input)?;
     let command = XbitCommand::from_str(command)?;
-    let (input, _) = preceded(multispace0, tag(","))(input)?;
-    let (input, name) = preceded(multispace0, is_not(","))(input)?;
-    let (input, _) = preceded(multispace0, tag(","))(input)?;
+    let (input, _) = parse_tag(",")(input)?;
+    let (input, name) = parse_token(input)?;
+    let (input, _) = parse_tag(",")(input)?;
     let track_parser = preceded(multispace0, tuple((tag("track"), multispace0, is_not(","))));
     let (input, (_, _, track)) = preceded(multispace0, track_parser)(input)?;
 
     fn parse_expire(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
-        let (input, _) = preceded(multispace0, tag(","))(input)?;
-        let (input, _) = multispace0(input)?;
-        let (input, _) = tag("expire")(input)?;
-        let (input, _) = multispace1(input)?;
-        let (input, expires) = alphanumeric1(input)?;
+        let (input, _) = parse_tag(",")(input)?;
+        let (input, _) = parse_tag("expire")(input)?;
+        let (input, expires) = parse_token(input)?;
         Ok((input, expires))
     }
 
@@ -647,14 +616,6 @@ mod test {
         let (_, flowbits) = parse_flowbits("toggle, myflow2").unwrap();
         assert_eq!(flowbits.command, FlowbitCommand::Toggle);
         assert_eq!(flowbits.names, vec!["myflow2"]);
-    }
-
-    #[test]
-    fn test_parse_number() {
-        let (_, number) = parse_digits("123").unwrap();
-        assert_eq!(number, "123");
-        assert!(parse_digits("123a").is_err());
-        assert!(parse_digits("a").is_err());
     }
 
     #[test]

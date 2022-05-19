@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 pub mod byte_math;
+mod common;
 pub mod ffi;
 pub mod parsers;
 pub mod types;
@@ -29,8 +30,8 @@ pub mod util;
 use crate::parsers::parse_metadata;
 use nom::bytes::complete::tag;
 use nom::character::complete::multispace0;
-use nom::error::ErrorKind;
 use nom::error::ParseError;
+use nom::error::{ErrorKind, FromExternalError};
 use nom::sequence::{preceded, tuple};
 use nom::IResult;
 use serde::Deserialize;
@@ -81,6 +82,13 @@ impl<I> ParseError<I> for RuleParseError<I> {
 
     fn append(_: I, _: ErrorKind, other: Self) -> Self {
         other
+    }
+}
+
+// Required for map_res to work with RuleParseError.
+impl<I, E> FromExternalError<I, E> for RuleParseError<I> {
+    fn from_external_error(input: I, kind: ErrorKind, _e: E) -> Self {
+        RuleParseError::Nom(input, kind)
     }
 }
 

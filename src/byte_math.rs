@@ -2,17 +2,13 @@
 //
 // Copyright (C) 2022 Open Information Security Foundation
 
+use crate::common::{parse_number, parse_tag, parse_token};
 use crate::RuleParseError;
-use nom::bytes::complete::{is_not, tag};
-use nom::character::complete::multispace0;
-use nom::sequence::preceded;
 use nom::Err::Error;
 use nom::IResult;
-use num_traits::Num;
 use serde::Deserialize;
 use serde::Serialize;
 use std::convert::TryFrom;
-use std::str::FromStr;
 
 #[cfg_attr(
     feature = "serde_support",
@@ -144,40 +140,10 @@ impl<'a> TryFrom<&'a str> for Base {
     }
 }
 
-/// Parse the next token ignoring leading whitespace.
-///
-/// A token is the next sequence of chars until a terminating character. Leading whitespace
-/// is ignore.
-fn parse_token(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
-    let terminators = "\n\r\t,;: ";
-    preceded(multispace0, is_not(terminators))(input)
-}
-
-/// Parse a tag ignoring any leading whitespace.
-///
-/// Useful for parsing an expected separator or keyword.
-fn parse_tag(sep: &str) -> impl Fn(&str) -> IResult<&str, &str, RuleParseError<&str>> + '_ {
-    move |input| preceded(multispace0, tag(sep))(input)
-}
-
 fn parse_op(input: &str) -> IResult<&str, ByteMathOperator, RuleParseError<&str>> {
     let (input, token) = parse_token(input)?;
     let op = ByteMathOperator::try_from(token).map_err(nom::Err::Error)?;
     Ok((input, op))
-}
-
-fn parse_number<'a, T: FromStr + Num>(
-    input: &'a str,
-    context: &str,
-) -> IResult<&'a str, T, RuleParseError<&'a str>> {
-    let (input, token) = parse_token(input)?;
-    let val = token.parse().map_err(|_| {
-        nom::Err::Error(RuleParseError::NumberParseError(format!(
-            "{}: {}",
-            context, token
-        )))
-    })?;
-    Ok((input, val))
 }
 
 fn parse_rvalue(input: &str) -> IResult<&str, Rvalue, RuleParseError<&str>> {
@@ -209,12 +175,12 @@ pub fn parse_byte_math(mut input: &str) -> IResult<&str, ByteMath, RuleParseErro
         (input, keyword) = parse_token(input)?;
         match keyword {
             "bytes" => {
-                let (i, v) = parse_number::<i64>(input, "bytes")?;
+                let (i, v) = parse_number::<i64>(input)?;
                 input = i;
                 bytes = Some(v);
             }
             "offset" => {
-                let (i, v) = parse_number::<i64>(input, "offset")?;
+                let (i, v) = parse_number::<i64>(input)?;
                 input = i;
                 offset = Some(v);
             }
