@@ -20,7 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-pub mod byte_math;
 mod common;
 pub mod ffi;
 pub mod parsers;
@@ -34,6 +33,7 @@ use nom::error::ParseError;
 use nom::error::{ErrorKind, FromExternalError};
 use nom::sequence::{preceded, tuple};
 use nom::IResult;
+use parsers::byte_math;
 use serde::Deserialize;
 use serde::Serialize;
 use types::*;
@@ -113,7 +113,7 @@ pub enum Element {
 
     // Body (option) elements.
     ByteJump(types::ByteJump),
-    ByteMath(byte_math::ByteMath),
+    ByteMath(ByteMath),
     ByteTest(ByteTest),
     Classtype(String),
     Content(Content),

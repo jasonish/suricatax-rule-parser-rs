@@ -2,6 +2,7 @@
 //
 // Copyright (C) 2021-2022 Jason Ish
 
+pub mod byte_math;
 pub mod byte_test;
 
 use crate::common::{parse_number, parse_tag, parse_token};

@@ -5,48 +5,10 @@
 use crate::common::{
     parse_base, parse_endian, parse_number, parse_number_or_name, parse_tag, parse_token,
 };
-use crate::{Base, Endian, NumberOrName, RuleParseError};
+use crate::{Base, ByteMath, ByteMathOperator, Endian, RuleParseError};
 use nom::Err::Error;
 use nom::IResult;
-use serde::Deserialize;
-use serde::Serialize;
 use std::convert::TryFrom;
-
-#[cfg_attr(
-    feature = "serde_support",
-    derive(Serialize, Deserialize),
-    serde(rename_all = "snake_case")
-)]
-#[derive(Debug, PartialEq, Clone)]
-pub struct ByteMath {
-    bytes: i64,
-    offset: i64,
-    oper: ByteMathOperator,
-    rvalue: Rvalue,
-    result: String,
-    relative: bool,
-    endian: Endian,
-    base: Base,
-    dce: bool,
-    bitmask: u32,
-}
-
-pub type Rvalue = NumberOrName<i64>;
-
-#[cfg_attr(
-    feature = "serde_support",
-    derive(Serialize, Deserialize),
-    serde(rename_all = "snake_case")
-)]
-#[derive(Debug, PartialEq, Clone)]
-pub enum ByteMathOperator {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Lshift,
-    Rshift,
-}
 
 impl<'a> TryFrom<&'a str> for ByteMathOperator {
     type Error = RuleParseError<&'a str>;
@@ -180,7 +142,7 @@ pub fn parse_byte_math(mut input: &str) -> IResult<&str, ByteMath, RuleParseErro
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Endian;
+    use crate::{ByteMathOperator, ByteMathRvalue, Endian};
 
     #[test]
     fn test_token() {
@@ -220,7 +182,7 @@ mod test {
                 oper: ByteMathOperator::Add,
                 relative: false,
                 result: "var".to_string(),
-                rvalue: Rvalue::Number(123),
+                rvalue: ByteMathRvalue::Number(123),
             }
         );
 
@@ -238,7 +200,7 @@ mod test {
                 oper: ByteMathOperator::Lshift,
                 relative: false,
                 result: "var".to_string(),
-                rvalue: Rvalue::Number(123),
+                rvalue: ByteMathRvalue::Number(123),
             }
         );
 
@@ -257,7 +219,7 @@ mod test {
                 oper: ByteMathOperator::Div,
                 relative: true,
                 result: "OFF1".to_string(),
-                rvalue: Rvalue::Number(2),
+                rvalue: ByteMathRvalue::Number(2),
             }
         );
     }

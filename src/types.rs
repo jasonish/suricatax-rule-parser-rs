@@ -102,6 +102,42 @@ impl Default for ByteJumpOffset {
     serde(rename_all = "snake_case")
 )]
 #[derive(Debug, PartialEq, Clone)]
+pub struct ByteMath {
+    pub bytes: i64,
+    pub offset: i64,
+    pub oper: ByteMathOperator,
+    pub rvalue: ByteMathRvalue,
+    pub result: String,
+    pub relative: bool,
+    pub endian: Endian,
+    pub base: Base,
+    pub dce: bool,
+    pub bitmask: u32,
+}
+
+pub type ByteMathRvalue = NumberOrName<i64>;
+
+#[cfg_attr(
+    feature = "serde_support",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "snake_case")
+)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum ByteMathOperator {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Lshift,
+    Rshift,
+}
+
+#[cfg_attr(
+    feature = "serde_support",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "snake_case")
+)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ByteTest {
     pub bytes: usize,
     pub op: ByteTestOperator,
