@@ -2,9 +2,7 @@ name: Build and Test
 
 on:
   push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,9 +10,20 @@ env:
 jobs:
   build:
 
+    strategy:
+      matrix:
+        rv: ["1.56.0", "stable", "nightly"]
+
     runs-on: ubuntu-latest
 
     steps:
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rv }}
+        override: true
+        components: rustfmt, clippy
+    - run: rustc --version
     - uses: actions/checkout@v2
     - name: Build
       run: cargo build --verbose
