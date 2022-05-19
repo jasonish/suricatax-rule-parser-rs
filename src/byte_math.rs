@@ -2,8 +2,10 @@
 //
 // Copyright (C) 2022 Jason Ish
 
-use crate::common::{parse_base, parse_number, parse_tag, parse_token};
-use crate::{Base, RuleParseError};
+use crate::common::{
+    parse_base, parse_endian, parse_number, parse_number_or_name, parse_tag, parse_token,
+};
+use crate::{Base, Endian, NumberOrName, RuleParseError};
 use nom::Err::Error;
 use nom::IResult;
 use serde::Deserialize;
@@ -28,6 +30,8 @@ pub struct ByteMath {
     dce: bool,
     bitmask: u32,
 }
+
+pub type Rvalue = NumberOrName<i64>;
 
 #[cfg_attr(
     feature = "serde_support",
@@ -63,62 +67,10 @@ impl<'a> TryFrom<&'a str> for ByteMathOperator {
     }
 }
 
-#[cfg_attr(
-    feature = "serde_support",
-    derive(Serialize, Deserialize),
-    serde(rename_all = "snake_case")
-)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum Endian {
-    Big,
-    Little,
-}
-
-impl Default for Endian {
-    fn default() -> Self {
-        Self::Big
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Endian {
-    type Error = RuleParseError<&'a str>;
-
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        let endian = match value {
-            "big" => Self::Big,
-            "little" => Self::Little,
-            _ => {
-                return Err(RuleParseError::BadEndianValue(value.to_string()));
-            }
-        };
-        Ok(endian)
-    }
-}
-
-#[cfg_attr(
-    feature = "serde_support",
-    derive(Serialize, Deserialize),
-    serde(rename_all = "snake_case")
-)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum Rvalue {
-    Value(i64),
-    Name(String),
-}
-
 fn parse_op(input: &str) -> IResult<&str, ByteMathOperator, RuleParseError<&str>> {
     let (input, token) = parse_token(input)?;
     let op = ByteMathOperator::try_from(token).map_err(nom::Err::Error)?;
     Ok((input, op))
-}
-
-fn parse_rvalue(input: &str) -> IResult<&str, Rvalue, RuleParseError<&str>> {
-    let (input, rvalue) = parse_token(input)?;
-    if let Ok(value) = rvalue.parse::<i64>() {
-        Ok((input, Rvalue::Value(value)))
-    } else {
-        Ok((input, Rvalue::Name(rvalue.to_string())))
-    }
 }
 
 pub fn parse_byte_math(mut input: &str) -> IResult<&str, ByteMath, RuleParseError<&str>> {
@@ -156,9 +108,9 @@ pub fn parse_byte_math(mut input: &str) -> IResult<&str, ByteMath, RuleParseErro
                 oper = Some(v);
             }
             "rvalue" => {
-                let (i, v) = parse_rvalue(input)?;
-                input = i;
+                let (i, v) = parse_number_or_name(input)?;
                 rvalue = Some(v);
+                input = i;
             }
             "result" => {
                 let (i, v) = parse_token(input)?;
@@ -168,8 +120,8 @@ pub fn parse_byte_math(mut input: &str) -> IResult<&str, ByteMath, RuleParseErro
             "relative" => relative = true,
             "dce" => dce = true,
             "endian" => {
-                let (i, v) = parse_token(input)?;
-                endian = Endian::try_from(v).map_err(nom::Err::Error)?;
+                let (i, v) = parse_endian(input)?;
+                endian = v;
                 input = i;
             }
             "string" => {
@@ -228,6 +180,7 @@ pub fn parse_byte_math(mut input: &str) -> IResult<&str, ByteMath, RuleParseErro
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::Endian;
 
     #[test]
     fn test_token() {
@@ -267,7 +220,7 @@ mod test {
                 oper: ByteMathOperator::Add,
                 relative: false,
                 result: "var".to_string(),
-                rvalue: Rvalue::Value(123),
+                rvalue: Rvalue::Number(123),
             }
         );
 
@@ -285,7 +238,7 @@ mod test {
                 oper: ByteMathOperator::Lshift,
                 relative: false,
                 result: "var".to_string(),
-                rvalue: Rvalue::Value(123),
+                rvalue: Rvalue::Number(123),
             }
         );
 
@@ -304,7 +257,7 @@ mod test {
                 oper: ByteMathOperator::Div,
                 relative: true,
                 result: "OFF1".to_string(),
-                rvalue: Rvalue::Value(2),
+                rvalue: Rvalue::Number(2),
             }
         );
     }
