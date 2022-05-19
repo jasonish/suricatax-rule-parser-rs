@@ -287,7 +287,7 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
     } else {
         let (input, value) = parse_option_value(input)?;
         let option = match name {
-            "byte_jump" => Element::ByteJump(parsers::parse_byte_jump(value)?.1),
+            "byte_jump" => Element::ByteJump(parsers::byte_jump::parse_byte_jump(value)?.1),
             "byte_math" => Element::ByteMath(byte_math::parse_byte_math(value)?.1),
             "byte_test" => Element::ByteTest(parsers::byte_test::parse_byte_test(value)?.1),
             "classtype" => Element::Classtype(value.to_owned()),
@@ -541,26 +541,27 @@ mod test {
         let (rem, _elements) = parse_elements(input).unwrap();
         assert_eq!(rem, "");
     }
+
     #[test]
     fn test_parse_byte_jump() {
-        assert!(parsers::parse_byte_jump("4").is_err());
-        assert!(parsers::parse_byte_jump("4,12").is_ok());
+        assert!(parsers::byte_jump::parse_byte_jump("4").is_err());
+        assert!(parsers::byte_jump::parse_byte_jump("4,12").is_ok());
 
         let input = "4,12,relative,little,multiplier 2";
-        let (_, byte_jump) = parsers::parse_byte_jump(input).unwrap();
+        let (_, byte_jump) = parsers::byte_jump::parse_byte_jump(input).unwrap();
         assert_eq!(byte_jump.count, 4);
-        assert_eq!(byte_jump.offset, ByteJumpOffset::Value(12));
+        assert_eq!(byte_jump.offset, NumberOrName::Number(12));
         assert_eq!(byte_jump.relative, true);
         assert_eq!(byte_jump.endian, types::Endian::Little);
         assert_eq!(byte_jump.multiplier, 2);
 
         // Same as above but with a bitmask.
         let input = "4,12,relative,little,multiplier 2,bitmask 0x3c";
-        let (_, byte_jump) = parsers::parse_byte_jump(input).unwrap();
+        let (_, byte_jump) = parsers::byte_jump::parse_byte_jump(input).unwrap();
         assert_eq!(byte_jump.bitmask, 0x3c);
 
         let input = "4,-18,relative,little,from_beginning, post_offset 1";
-        let (_, _byte_jump) = parsers::parse_byte_jump(input).unwrap();
+        let (_, _byte_jump) = parsers::byte_jump::parse_byte_jump(input).unwrap();
     }
 
     #[test]

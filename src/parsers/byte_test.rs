@@ -50,13 +50,23 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
         let (mut i, opt) = parse_token(i)?;
         match opt {
             "relative" => relative = true,
-            "endian" => (i, endian) = parse_endian(i)?,
+            "endian" => {
+                let (_i, _endian) = parse_endian(i)?;
+                i = _i;
+                endian = _endian;
+            }
             "dce" => dce = true,
-            "bitmask" => (i, bitmask) = parse_number(i)?,
+            "bitmask" => {
+                let (_i, _bitmask) = parse_number(i)?;
+                i = _i;
+                bitmask = _bitmask;
+            }
             "string" => {
                 string = true;
-                (i, _) = parse_tag(",")(i)?;
-                (i, base) = parse_base(i)?;
+                let (_i, _) = parse_tag(",")(i)?;
+                let (_i, _base) = parse_base(_i)?;
+                base = _base;
+                i = _i;
             }
             _ => {
                 return Err(Error(RuleParseError::UnknownOption(opt.to_string())));

@@ -41,13 +41,19 @@ pub enum NumberOrName<T> {
     Name(String),
 }
 
+impl Default for NumberOrName<i32> {
+    fn default() -> Self {
+        Self::Number(0_i32)
+    }
+}
+
 /// Byte jump.
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq)]
 #[repr(C)]
 pub struct ByteJump {
     pub count: usize,
-    pub offset: ByteJumpOffset,
+    pub offset: NumberOrName<i32>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
     pub relative: bool,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
@@ -77,23 +83,6 @@ pub struct ByteJump {
     pub dce: bool,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
     pub bitmask: u64,
-}
-
-#[cfg_attr(
-    feature = "serde_support",
-    derive(Serialize, Deserialize),
-    serde(rename_all = "snake_case")
-)]
-#[derive(Clone, Debug, PartialEq)]
-pub enum ByteJumpOffset {
-    Value(i32),
-    Name(String),
-}
-
-impl Default for ByteJumpOffset {
-    fn default() -> Self {
-        Self::Value(0)
-    }
 }
 
 #[cfg_attr(

@@ -50,9 +50,9 @@ pub fn parse_byte_math(mut input: &str) -> IResult<&str, ByteMath, RuleParseErro
     let mut base = Base::default();
     let mut bitmask = 0;
 
-    let mut keyword;
     loop {
-        (input, keyword) = parse_token(input)?;
+        let (_input, keyword) = parse_token(input)?;
+        input = _input;
         match keyword {
             "bytes" => {
                 let (i, v) = parse_number::<i64>(input)?;

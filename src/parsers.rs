@@ -2,6 +2,7 @@
 //
 // Copyright (C) 2021-2022 Jason Ish
 
+pub mod byte_jump;
 pub mod byte_math;
 pub mod byte_test;
 
@@ -140,103 +141,6 @@ pub(crate) fn parse_count_or_name(
     } else {
         Ok((input, types::CountOrName::Var(input.to_string())))
     }
-}
-
-pub(crate) fn parse_byte_jump(input: &str) -> IResult<&str, types::ByteJump, RuleParseError<&str>> {
-    // First separate the comma separated values.
-    let (_, values) = nom::multi::separated_list1(
-        tag(","),
-        preceded(multispace0, nom::bytes::complete::is_not(",")),
-    )(input)?;
-    if values.len() < 2 {
-        return Err(Error(RuleParseError::InvalidByteJump(
-            "not enough arguments".into(),
-        )));
-    }
-
-    let mut byte_jump = types::ByteJump::default();
-
-    // Inner utility function for easy error creation.
-    fn make_error(reason: String) -> nom::Err<RuleParseError<&'static str>> {
-        Error(RuleParseError::InvalidByteJump(reason))
-    }
-
-    byte_jump.count = values[0]
-        .parse()
-        .map_err(|_| make_error(format!("invalid count: {}", values[0])))?;
-
-    if let Ok(offset) = values[1].parse::<i32>() {
-        byte_jump.offset = ByteJumpOffset::Value(offset);
-    } else {
-        byte_jump.offset = ByteJumpOffset::Name(values[1].to_string());
-    }
-
-    for value in &values[2..] {
-        let (value, name) = take_until_whitespace(value)?;
-        match name {
-            "relative" => {
-                byte_jump.relative = true;
-            }
-            "little" => {
-                byte_jump.endian = types::Endian::Little;
-            }
-            "big" => {
-                byte_jump.endian = types::Endian::Big;
-            }
-            "align" => {
-                byte_jump.align = true;
-            }
-            "from_beginning" => {
-                byte_jump.from_beginning = true;
-            }
-            "from_end" => {
-                byte_jump.from_end = true;
-            }
-            "dce" => {
-                byte_jump.dce = true;
-            }
-            "string" => {
-                byte_jump.string = true;
-            }
-            "hex" => {
-                byte_jump.hex = true;
-            }
-            "dec" => {
-                byte_jump.dec = true;
-            }
-            "oct" => {
-                byte_jump.oct = true;
-            }
-            "multiplier" => {
-                byte_jump.multiplier = value
-                    .trim()
-                    .parse::<usize>()
-                    .map_err(|_| make_error(format!("invalid multiplier: {}", value)))?;
-            }
-            "post_offset" => {
-                byte_jump.post_offset = value
-                    .trim()
-                    .parse::<i64>()
-                    .map_err(|_| make_error(format!("invalid post_offset: {}", value)))?;
-            }
-            "bitmask" => {
-                let value = value.trim();
-                let trimmed = if value.starts_with("0x") || value.starts_with("0X") {
-                    &value[2..]
-                } else {
-                    value
-                };
-                let value = u64::from_str_radix(trimmed, 16)
-                    .map_err(|_| make_error(format!("invalid bitmask: {}", value)))?;
-                byte_jump.bitmask = value;
-            }
-            _ => {
-                return Err(make_error(format!("unknown parameter: {}", name)));
-            }
-        }
-    }
-
-    Ok((input, byte_jump))
 }
 
 pub(crate) fn parse_flowbits(input: &str) -> IResult<&str, Flowbits, RuleParseError<&str>> {
