@@ -1,0 +1,10 @@
+[package]
+name = "rjs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Jason Ish <jason@codemonkey.net>"]
+
+[dependencies]
+suricatax-rule-parser = { path = ".." }
+clap = "3.0.0-beta.5"
+serde_json = "*"
