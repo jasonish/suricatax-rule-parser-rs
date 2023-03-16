@@ -185,7 +185,12 @@ pub(crate) fn parse_flowbits(input: &str) -> IResult<&str, Flowbits, RuleParseEr
 pub(crate) fn parse_isdataat(input: &str) -> IResult<&str, IsDataAt, RuleParseError<&str>> {
     // Look for a possible negation flag.
     let (input, negate) = preceded(multispace0, opt(tag("!")))(input)?;
-    let (input, position) = parse_number::<u16>(input)?;
+    let (input, position) = parse_token(input)?;
+    let position = if let Ok((_, number)) = parse_number::<u64>(position) {
+        IsDataAtPosition::Position(number)
+    } else {
+        IsDataAtPosition::Identifier(position.to_string())
+    };
     let mut relative = false;
     let mut rawbytes = false;
 
@@ -533,7 +538,7 @@ mod test {
         assert_eq!(
             isdataat,
             IsDataAt {
-                position: 100,
+                position: IsDataAtPosition::Position(100),
                 negate: false,
                 relative: false,
                 rawbytes: false,
@@ -544,7 +549,7 @@ mod test {
         assert_eq!(
             isdataat,
             IsDataAt {
-                position: 100,
+                position: IsDataAtPosition::Position(100),
                 negate: true,
                 relative: false,
                 rawbytes: false,
@@ -555,7 +560,7 @@ mod test {
         assert_eq!(
             isdataat,
             IsDataAt {
-                position: 100,
+                position: IsDataAtPosition::Position(100),
                 negate: true,
                 relative: true,
                 rawbytes: false,
@@ -566,7 +571,7 @@ mod test {
         assert_eq!(
             isdataat,
             IsDataAt {
-                position: 100,
+                position: IsDataAtPosition::Position(100),
                 negate: true,
                 relative: false,
                 rawbytes: true,
@@ -577,7 +582,7 @@ mod test {
         assert_eq!(
             isdataat,
             IsDataAt {
-                position: 100,
+                position: IsDataAtPosition::Position(100),
                 negate: true,
                 relative: true,
                 rawbytes: true,
@@ -585,6 +590,17 @@ mod test {
         );
 
         assert!(parse_isdataat("!100, absolute").is_err());
+
+        let (_, isdataat) = parse_isdataat("!length,relative").unwrap();
+        assert_eq!(
+            isdataat,
+            IsDataAt {
+                position: IsDataAtPosition::Identifier("length".to_string()),
+                negate: true,
+                relative: true,
+                rawbytes: false,
+            }
+        );
     }
 
     #[test]

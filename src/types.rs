@@ -285,11 +285,18 @@ impl FromStr for FlowbitCommand {
     }
 }
 
+#[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, PartialEq)]
+pub enum IsDataAtPosition {
+    Position(u64),
+    Identifier(String),
+}
+
 /// IsDataAt (isdataat)
 #[cfg_attr(feature = "serde_support", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct IsDataAt {
-    pub position: u16,
+    pub position: IsDataAtPosition,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
     pub negate: bool,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
