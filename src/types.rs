@@ -129,6 +129,7 @@ pub enum ByteMathOperator {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ByteTest {
     pub bytes: usize,
+    pub negate: bool,
     pub op: ByteTestOperator,
     pub value: NumberOrName<u64>,
     pub offset: NumberOrName<i32>,

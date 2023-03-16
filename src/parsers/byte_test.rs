@@ -6,6 +6,8 @@ use crate::common::{
     parse_base, parse_endian, parse_number, parse_number_or_name, parse_tag, parse_token,
 };
 use crate::{Base, ByteTest, ByteTestOperator, Endian, RuleParseError};
+use nom::bytes::complete::tag;
+use nom::combinator::opt;
 use nom::Err::Error;
 use nom::IResult;
 
@@ -32,6 +34,7 @@ fn parse_op(input: &str) -> IResult<&str, ByteTestOperator, RuleParseError<&str>
 pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&str>> {
     let (input, bytes) = parse_number::<usize>(input)?;
     let (input, _) = parse_tag(",")(input)?;
+    let (input, negate) = opt(tag("!"))(input)?;
     let (input, op) = parse_op(input)?;
     let (input, _) = parse_tag(",")(input)?;
     let (input, value) = parse_number_or_name::<u64>(input)?;
@@ -79,6 +82,7 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
         input,
         ByteTest {
             bytes,
+            negate: negate.is_some(),
             op,
             value,
             offset,
@@ -108,6 +112,7 @@ mod test {
             bt,
             ByteTest {
                 bytes: 4,
+                negate: false,
                 op: ByteTestOperator::Eq,
                 value: NumberOrName::Number(1337),
                 offset: NumberOrName::Number(1),
@@ -125,6 +130,7 @@ mod test {
             bt,
             ByteTest {
                 bytes: 8,
+                negate: false,
                 op: ByteTestOperator::Eq,
                 value: NumberOrName::Number(0xdeadbeef),
                 offset: NumberOrName::Number(0),
@@ -132,6 +138,42 @@ mod test {
                 endian: Endian::Big,
                 string: true,
                 base: Base::Hex,
+                dce: false,
+                bitmask: 0,
+            }
+        );
+
+        let (_, bt) = parse_byte_test("1,!=,0x20,0,string,hex,relative").unwrap();
+        assert_eq!(
+            bt,
+            ByteTest {
+                bytes: 1,
+                negate: true,
+                op: ByteTestOperator::Eq,
+                value: NumberOrName::Number(0x20),
+                offset: NumberOrName::Number(0),
+                relative: true,
+                endian: Endian::Big,
+                string: true,
+                base: Base::Hex,
+                dce: false,
+                bitmask: 0,
+            }
+        );
+
+        let (_, bt) = parse_byte_test("1,!&,0x40,2").unwrap();
+        assert_eq!(
+            bt,
+            ByteTest {
+                bytes: 1,
+                negate: true,
+                op: ByteTestOperator::And,
+                value: NumberOrName::Number(0x40),
+                offset: NumberOrName::Number(2),
+                relative: false,
+                endian: Endian::Big,
+                string: false,
+                base: Base::Dec,
                 dce: false,
                 bitmask: 0,
             }
