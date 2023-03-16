@@ -95,10 +95,10 @@ impl Drop for CElement {
         unsafe {
             match self.tag {
                 ElementTag::Action => {
-                    CString::from_raw(self.val as *mut c_char);
+                    let _ = CString::from_raw(self.val as *mut c_char);
                 }
                 ElementTag::Flowbits => {
-                    Box::from_raw(self.val as *mut CFlowbits);
+                    let _ = Box::from_raw(self.val as *mut CFlowbits);
                 }
                 _ => {}
             }
