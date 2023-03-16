@@ -2,9 +2,7 @@
 //
 // Copyright (C) 2022 Jason Ish
 
-use crate::common::{
-    parse_base, parse_endian, parse_number, parse_number_or_name, parse_tag, parse_token,
-};
+use crate::common::{parse_base, parse_number, parse_number_or_name, parse_tag, parse_token};
 use crate::{Base, ByteTest, ByteTestOperator, Endian, RuleParseError};
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -53,11 +51,11 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
         let (mut i, opt) = parse_token(i)?;
         match opt {
             "relative" => relative = true,
-            "endian" => {
-                let (_i, _endian) = parse_endian(i)?;
-                i = _i;
-                endian = _endian;
-            }
+            // "endian" => {
+            //     let (_i, _endian) = parse_endian(i)?;
+            //     i = _i;
+            //     endian = _endian;
+            // }
             "dce" => dce = true,
             "bitmask" => {
                 let (_i, _bitmask) = parse_number(i)?;
@@ -70,6 +68,12 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
                 let (_i, _base) = parse_base(_i)?;
                 base = _base;
                 i = _i;
+            }
+            "big" => {
+                endian = Endian::Big;
+            }
+            "little" => {
+                endian = Endian::Little;
             }
             _ => {
                 return Err(Error(RuleParseError::UnknownOption(opt.to_string())));
@@ -172,6 +176,24 @@ mod test {
                 offset: NumberOrName::Number(2),
                 relative: false,
                 endian: Endian::Big,
+                string: false,
+                base: Base::Dec,
+                dce: false,
+                bitmask: 0,
+            }
+        );
+
+        let (_, bt) = parse_byte_test("4,>,128,20,relative,little").unwrap();
+        assert_eq!(
+            bt,
+            ByteTest {
+                bytes: 4,
+                negate: false,
+                op: ByteTestOperator::Gt,
+                value: NumberOrName::Number(128),
+                offset: NumberOrName::Number(20),
+                relative: true,
+                endian: Endian::Little,
                 string: false,
                 base: Base::Dec,
                 dce: false,
