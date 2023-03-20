@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: (C) 2022 Jason Ish
 //
-// Copyright (C) 2022 Jason Ish
+// SPDX-License-Identifier: MIT
 
-use crate::common::{parse_base, parse_number, parse_number_or_name, parse_tag, parse_token};
-use crate::{Base, ByteTest, ByteTestOperator, Endian, RuleParseError};
+use crate::common::{parse_number, parse_number_or_name, parse_tag, parse_token};
+use crate::{ByteTest, ByteTestOperator, Endian, RuleParseError};
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
 use nom::Err::Error;
@@ -42,7 +42,9 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
     let mut relative = false;
     let mut endian = Endian::Big;
     let mut string = false;
-    let mut base = Base::default();
+    let mut hex = false;
+    let mut dec = false;
+    let mut oct = false;
     let mut dce = false;
     let mut bitmask = 0;
 
@@ -51,11 +53,6 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
         let (mut i, opt) = parse_token(i)?;
         match opt {
             "relative" => relative = true,
-            // "endian" => {
-            //     let (_i, _endian) = parse_endian(i)?;
-            //     i = _i;
-            //     endian = _endian;
-            // }
             "dce" => dce = true,
             "bitmask" => {
                 let (_i, _bitmask) = parse_number(i)?;
@@ -64,10 +61,15 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
             }
             "string" => {
                 string = true;
-                let (_i, _) = parse_tag(",")(i)?;
-                let (_i, _base) = parse_base(_i)?;
-                base = _base;
-                i = _i;
+            }
+            "hex" => {
+                hex = true;
+            }
+            "dec" => {
+                dec = true;
+            }
+            "oct" => {
+                oct = true;
             }
             "big" => {
                 endian = Endian::Big;
@@ -93,7 +95,9 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
             relative,
             endian,
             string,
-            base,
+            hex,
+            dec,
+            oct,
             dce,
             bitmask,
         },
@@ -123,7 +127,9 @@ mod test {
                 relative: true,
                 endian: Endian::Big,
                 string: true,
-                base: Base::Dec,
+                hex: false,
+                dec: true,
+                oct: false,
                 dce: false,
                 bitmask: 0,
             }
@@ -141,7 +147,9 @@ mod test {
                 relative: false,
                 endian: Endian::Big,
                 string: true,
-                base: Base::Hex,
+                hex: true,
+                dec: false,
+                oct: false,
                 dce: false,
                 bitmask: 0,
             }
@@ -159,7 +167,9 @@ mod test {
                 relative: true,
                 endian: Endian::Big,
                 string: true,
-                base: Base::Hex,
+                hex: true,
+                dec: false,
+                oct: false,
                 dce: false,
                 bitmask: 0,
             }
@@ -177,7 +187,9 @@ mod test {
                 relative: false,
                 endian: Endian::Big,
                 string: false,
-                base: Base::Dec,
+                hex: false,
+                dec: false,
+                oct: false,
                 dce: false,
                 bitmask: 0,
             }
@@ -195,7 +207,9 @@ mod test {
                 relative: true,
                 endian: Endian::Little,
                 string: false,
-                base: Base::Dec,
+                hex: false,
+                dec: false,
+                oct: false,
                 dce: false,
                 bitmask: 0,
             }

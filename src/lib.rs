@@ -588,5 +588,7 @@ mod test {
     #[test]
     fn test_parse_rules() {
         parse_elements(r#"alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ET WEB_SPECIFIC_APPS ProjectButler RFI attempt"; flow:established,to_server; http.uri; content:"/pda_projects.php?offset=http\:"; nocase; reference:url,www.sans.org/top20/; reference:url,www.packetstormsecurity.org/0908-exploits/projectbutler-rfi.txt; reference:url,doc.emergingthreats.net/2009887; classtype:web-application-attack; sid:2009887; rev:7; metadata:created_at 2010_07_30, former_category WEB_SPECIFIC_APPS, updated_at 2020_09_10;)"#).unwrap();
+
+        parse_elements(r#"alert ip $HOME_NET any -> $EXTERNAL_NET any (msg:"GPL ATTACK_RESPONSE id check returned userid"; content:"uid="; byte_test:5,<,65537,0,relative,string; content:" gid="; within:15; byte_test:5,<,65537,0,relative,string; classtype:bad-unknown; sid:2101882; rev:11; metadata:created_at 2010_09_23, updated_at 2010_09_23;)"#).unwrap();
     }
 }

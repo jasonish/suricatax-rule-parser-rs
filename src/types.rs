@@ -136,9 +136,11 @@ pub struct ByteTest {
     pub relative: bool,
     pub endian: Endian,
     pub string: bool,
-    pub base: Base,
     pub dce: bool,
     pub bitmask: u32,
+    pub hex: bool,
+    pub dec: bool,
+    pub oct: bool,
 }
 
 #[cfg_attr(
