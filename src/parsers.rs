@@ -413,7 +413,7 @@ mod test {
         let input0 = r#"!"/^onedrivecl[a-z]{2}prod[a-z]{2}[0-9]{5}\./""#;
         let (_, pcre) = parse_pcre(input0).unwrap();
         assert_eq!(rem, "");
-        assert_eq!(pcre.negate, true);
+        assert!(pcre.negate);
 
         let input0 = r#"! "/^\w+\s+\w+:\/\/([^\/\s:#]+)[\/\s:#]\S*.+?Host:[ \t]*\1\S*\b/is""#;
         let (rem, pcre) = parse_pcre(input0).unwrap();

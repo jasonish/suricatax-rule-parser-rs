@@ -533,7 +533,7 @@ mod test {
         let (_, byte_jump) = parsers::byte_jump::parse_byte_jump(input).unwrap();
         assert_eq!(byte_jump.count, 4);
         assert_eq!(byte_jump.offset, NumberOrName::Number(12));
-        assert_eq!(byte_jump.relative, true);
+        assert!(byte_jump.relative);
         assert_eq!(byte_jump.endian, types::Endian::Little);
         assert_eq!(byte_jump.multiplier, 2);
 
