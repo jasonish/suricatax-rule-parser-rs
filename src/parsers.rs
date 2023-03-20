@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: (C) 2021 Jason Ish
 //
-// Copyright (C) 2021-2022 Jason Ish
+// SPDX-License-Identifier: MIT
 
 pub mod byte_jump;
 pub mod byte_math;
@@ -94,7 +94,7 @@ pub(crate) fn parse_list(input: &str) -> IResult<&str, &str, RuleParseError<&str
 /// The return value is a String with escapes removed and no leading or trailing
 /// double quotes.
 fn parse_quoted_string(input: &str) -> IResult<&str, String, RuleParseError<&str>> {
-    let escaped_parser = escaped_transform(none_of("\\\""), '\\', one_of("\"\\;"));
+    let escaped_parser = escaped_transform(none_of("\\\""), '\\', one_of("\"\\;\\:"));
     let empty = map(tag(""), |s: &str| s.to_string());
     let escaped_or_empty = alt((escaped_parser, empty));
     delimited(tag("\""), escaped_or_empty, tag("\""))(input)
@@ -662,5 +662,16 @@ mod test {
             }
         );
         assert_eq!(i, ", within 5");
+
+        let (rem, content) = parse_content(r#""/pda_projects.php?offset=http\:""#).unwrap();
+        assert_eq!(rem, "");
+        assert_eq!(
+            content,
+            types::Content {
+                negate: false,
+                pattern: r#"/pda_projects.php?offset=http:"#.to_string(),
+                ..Default::default()
+            }
+        )
     }
 }
