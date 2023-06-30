@@ -15,7 +15,6 @@ default = ["serde_support"]
 serde_support = ["serde"]
 
 [dependencies]
-nom = "7"
+nom = "7.1.3"
 num-traits = "0.2.15"
-serde = { version = "1.0.163", default_features = false, features = ["std", "derive"], optional = true }
-      
+serde = { version = "1.0.164", default_features = false, features = ["std", "derive"], optional = true }
