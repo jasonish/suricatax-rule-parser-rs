@@ -25,6 +25,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::Lines;
 use std::io::Read;
+use suricatax_rule_parser::parsers::ArrayElement;
 use suricatax_rule_parser::types::Direction;
 use suricatax_rule_parser::Element;
 
@@ -56,11 +57,11 @@ struct Rule {
     // Header.
     action: String,
     protocol: String,
-    src_addr: String,
-    src_port: String,
+    src_addr: Vec<ArrayElement>,
+    src_port: Vec<ArrayElement>,
     direction: Direction,
-    dst_addr: String,
-    dst_port: String,
+    dst_addr: Vec<ArrayElement>,
+    dst_port: Vec<ArrayElement>,
 
     // Rule options that should only exist once or get aggregated into a single
     // entry.

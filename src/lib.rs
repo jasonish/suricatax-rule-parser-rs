@@ -15,7 +15,7 @@ use nom::error::ParseError;
 use nom::error::{ErrorKind, FromExternalError};
 use nom::sequence::{preceded, tuple};
 use nom::IResult;
-use parsers::byte_math;
+use parsers::{byte_math, ArrayElement};
 use serde::Deserialize;
 use serde::Serialize;
 use types::*;
@@ -25,7 +25,7 @@ use types::*;
 /// Implemented based on the Nom example for implementing custom errors.
 #[derive(Debug, PartialEq)]
 pub enum RuleParseError<I> {
-    UnterminatedList,
+    UnbalancedArray,
     UnterminatedRuleOptionValue,
     InvalidSid(String),
     InvalidDirection(String),
@@ -87,11 +87,11 @@ pub enum Element {
     // Header elements.
     Action(String),
     Protocol(String),
-    SrcAddr(String),
-    SrcPort(String),
+    SrcAddr(Vec<ArrayElement>),
+    SrcPort(Vec<ArrayElement>),
     Direction(Direction),
-    DstAddr(String),
-    DstPort(String),
+    DstAddr(Vec<ArrayElement>),
+    DstPort(Vec<ArrayElement>),
 
     // Body (option) elements.
     ByteJump(types::ByteJump),
@@ -318,19 +318,20 @@ pub fn parse_elements(input: &str) -> IResult<&str, Vec<Element>, RuleParseError
     let (input, (action, proto, src_addr, src_port, direction, dst_addr, dst_port)) = tuple((
         preceded(multispace0, parsers::take_until_whitespace),
         preceded(multispace0, parsers::take_until_whitespace),
-        preceded(multispace0, parsers::parse_list),
-        preceded(multispace0, parsers::parse_list),
+        preceded(multispace0, parsers::parse_array),
+        preceded(multispace0, parsers::parse_array),
         preceded(multispace0, parsers::parse_direction),
-        preceded(multispace0, parsers::parse_list),
-        preceded(multispace0, parsers::parse_list),
+        preceded(multispace0, parsers::parse_array),
+        preceded(multispace0, parsers::parse_array),
     ))(input)?;
+    dbg!(&src_addr);
     elements.push(Element::Action(action.into()));
     elements.push(Element::Protocol(proto.into()));
-    elements.push(Element::SrcAddr(src_addr.into()));
-    elements.push(Element::SrcPort(src_port.into()));
+    elements.push(Element::SrcAddr(src_addr));
+    elements.push(Element::SrcPort(src_port));
     elements.push(Element::Direction(direction));
-    elements.push(Element::DstAddr(dst_addr.into()));
-    elements.push(Element::DstPort(dst_port.into()));
+    elements.push(Element::DstAddr(dst_addr));
+    elements.push(Element::DstPort(dst_port));
 
     // Now find the start of options indicator '('.
     let (input, _start_of_options) = preceded(multispace0, tag("("))(input)?;
@@ -563,25 +564,6 @@ mod test {
         let (rem, value) = parse_option_value("   value ;next option").unwrap();
         assert_eq!(rem, "next option");
         assert_eq!(value, "value ");
-    }
-
-    #[test]
-    fn test_parse_list() {
-        let (_rem, list) = parsers::parse_list("[").unwrap();
-        assert_eq!(_rem, "");
-        assert_eq!(list, "[");
-
-        let (_rem, list) = parsers::parse_list("[]a").unwrap();
-        assert_eq!(_rem, "a");
-        assert_eq!(list, "[]");
-
-        let (_rem, list) = parsers::parse_list("[1,[1,2],[1,2,3]]a").unwrap();
-        assert_eq!(_rem, "a");
-        assert_eq!(list, "[1,[1,2],[1,2,3]]");
-
-        let (_rem, list) = parsers::parse_list("[1,[1,2],[1, 2, 3  ]]a").unwrap();
-        assert_eq!(_rem, "a");
-        assert_eq!(list, "[1,[1,2],[1, 2, 3  ]]");
     }
 
     /// Tests for specific rules that have caused parse errors.

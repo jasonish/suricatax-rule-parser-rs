@@ -18,3 +18,4 @@ serde_support = ["serde"]
 nom = "7"
 num-traits = "0.2.15"
 serde = { version = "1.0.163", default_features = false, features = ["std", "derive"], optional = true }
+      

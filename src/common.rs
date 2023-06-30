@@ -15,7 +15,7 @@ use std::str::FromStr;
 /// Parse the next token ignoring leading whitespace.
 ///
 /// A token is the next sequence of chars until a terminating character. Leading whitespace
-/// is ignore.
+/// is ignored.
 pub fn parse_token(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
     let terminators = "\n\r\t,;: ";
     preceded(multispace0, is_not(terminators))(input)
@@ -76,4 +76,20 @@ pub fn parse_base(input: &str) -> IResult<&str, Base, RuleParseError<&str>> {
         }
     };
     Ok((input, base))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_token() {
+        assert_eq!(parse_token("foo"), Ok(("", "foo")));
+        assert_eq!(parse_token("foo/bar"), Ok(("", "foo/bar")));
+        assert_eq!(parse_token("foo, bar"), Ok((", bar", "foo")));
+        assert_eq!(
+            parse_token("1.1.1.1/32,2.2.2.2/0"),
+            Ok((",2.2.2.2/0", "1.1.1.1/32"))
+        );
+    }
 }

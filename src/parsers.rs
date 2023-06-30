@@ -18,12 +18,13 @@ use nom::character::complete::one_of;
 use nom::character::complete::{alphanumeric1, multispace0};
 use nom::combinator::map;
 use nom::combinator::{eof, opt, rest};
-use nom::error::ErrorKind;
 use nom::multi::separated_list0;
 use nom::sequence::delimited;
 use nom::sequence::{preceded, terminated, tuple};
 use nom::Err::Error;
 use nom::IResult;
+use serde::Deserialize;
+use serde::Serialize;
 use std::str::FromStr;
 
 static WHITESPACE: &str = " \t\r\n";
@@ -51,36 +52,94 @@ pub(crate) fn parse_u64<'a>(
     Ok((input, val))
 }
 
-/// Parse a list like an address or port list.
-///
-/// This doesn't actually produce the elements of the list, but just the full string
-/// encapsulating the list.
-pub(crate) fn parse_list(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
+#[cfg_attr(
+    feature = "serde_support",
+    derive(Serialize, Deserialize),
+    serde(rename_all = "snake_case"),
+    serde(untagged)
+)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ArrayElement {
+    String(String),
+    Array(Vec<ArrayElement>),
+}
+
+pub fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, RuleParseError<&str>> {
+    // Use a stack to avoid recursion. Should probably still set a
+    // size bound on it.
+    let mut stack: Vec<Vec<ArrayElement>> = vec![Vec::new()];
+    let mut token = String::new();
     let mut depth = 0;
-    let mut end = 0;
-    if input.is_empty() {
-        return Err(nom::Err::Error(RuleParseError::Nom(input, ErrorKind::Eof)));
+    let mut offset = 0;
+
+    // We might not always have an array, if not, parse a scalar and
+    // return it as an array.
+    if !input.starts_with('[') {
+        let (input, scalar) = parse_token(input)?;
+        return Ok((input, vec![ArrayElement::String(scalar.to_string())]));
     }
-    for (i, c) in input.chars().enumerate() {
-        if i == 0 && c != '[' {
-            // Cheat a little, just return the next non-whitespace token.
-            return take_until_whitespace(input);
-        }
-        end = i;
-        match c {
+
+    for ch in input.chars() {
+        offset += 1;
+        match ch {
             '[' => {
                 depth += 1;
+                stack.push(Vec::new())
             }
             ']' => {
+                if !token.is_empty() {
+                    if let Some(top) = stack.last_mut() {
+                        top.push(ArrayElement::String(token.clone()));
+                        token.clear();
+                    } else {
+                        return Err(nom::Err::Error(RuleParseError::UnbalancedArray));
+                    }
+                }
+                let last = stack
+                    .pop()
+                    .ok_or(nom::Err::Error(RuleParseError::UnbalancedArray))?;
+                if let Some(top) = stack.last_mut() {
+                    top.push(ArrayElement::Array(last));
+                } else {
+                    return Err(nom::Err::Error(RuleParseError::UnbalancedArray));
+                }
+
                 depth -= 1;
+
+                if depth == 0 {
+                    break;
+                }
             }
-            _ => {}
-        }
-        if depth == 0 {
-            break;
+            ',' => {
+                if !token.is_empty() {
+                    if let Some(top) = stack.last_mut() {
+                        top.push(ArrayElement::String(token.clone()));
+                        token.clear();
+                    } else {
+                        return Err(nom::Err::Error(RuleParseError::UnbalancedArray));
+                    }
+                }
+            }
+            _ => token.push(ch),
         }
     }
-    Ok((&input[end + 1..], &input[0..end + 1]))
+
+    if !token.is_empty() {
+        if let Some(top) = stack.last_mut() {
+            top.push(ArrayElement::String(token.clone()));
+        } else {
+            return Err(nom::Err::Error(RuleParseError::UnbalancedArray));
+        }
+    }
+
+    // Double unwrap as we used a stack to avoid recursion.
+    if let Some(mut stack) = stack.pop() {
+        if let Some(ArrayElement::Array(stack)) = stack.pop() {
+            return Ok((&input[offset..], stack));
+        }
+    }
+
+    Err(nom::Err::Error(RuleParseError::UnbalancedArray))
 }
 
 /// Parse a quote string as often seen in Suricata rules.
@@ -336,6 +395,45 @@ fn parse_end_quote(input: &str) -> IResult<&str, &str, RuleParseError<&str>> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_parse_array() {
+        let input = "[a]xxx";
+        let (rem, array) = parse_array(input).unwrap();
+        assert_eq!(rem, "xxx");
+        assert_eq!(array, vec![ArrayElement::String("a".to_string())]);
+
+        let input = "[a,bbb]xxx";
+        let (rem, array) = parse_array(input).unwrap();
+        assert_eq!(rem, "xxx");
+        assert_eq!(
+            array,
+            vec![
+                ArrayElement::String("a".to_string()),
+                ArrayElement::String("bbb".to_string())
+            ]
+        );
+
+        let input = "[a,[bbb,ccc,[xxx]],ddd,[eee,fff]]aaa";
+        let (rem, array) = parse_array(input).unwrap();
+        assert_eq!(rem, "aaa");
+        assert_eq!(
+            array,
+            vec![
+                ArrayElement::String("a".to_string()),
+                ArrayElement::Array(vec![
+                    ArrayElement::String("bbb".to_string()),
+                    ArrayElement::String("ccc".to_string()),
+                    ArrayElement::Array(vec![ArrayElement::String("xxx".to_string())]),
+                ]),
+                ArrayElement::String("ddd".to_string()),
+                ArrayElement::Array(vec![
+                    ArrayElement::String("eee".to_string()),
+                    ArrayElement::String("fff".to_string()),
+                ]),
+            ]
+        );
+    }
 
     #[test]
     fn test_parse_pcre() {
