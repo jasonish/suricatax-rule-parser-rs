@@ -1,6 +1,5 @@
-// SPDX-FileCopyrightText: (C) 2022 Jason Ish
-//
-// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: (C) 2022 Jason Ish <jason@codemonkey.net>
+// SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::common::{parse_number, parse_number_or_name, parse_tag, parse_token};
 use crate::{ByteTest, ByteTestOperator, Endian, RuleParseError};

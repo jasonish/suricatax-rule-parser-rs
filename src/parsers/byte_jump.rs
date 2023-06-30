@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: MIT
-//
-// Copyright (C) 2021-2022 Jason Ish
+// SPDX-FileCopyrightText: (C) 2021 Jason Ish <jason@codemonkey.net>
+// SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::common::{parse_number, parse_number_or_name, parse_tag, parse_token};
 use crate::{ByteJump, Endian, RuleParseError};

@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: MIT
-//
-// Copyright (C) 2022 Jason Ish
+// SPDX-FileCopyrightText: (C) 2022 Jason Ish <jason@codemonkey.net>
+// SPDX-License-Identifier: MIT OR Apache-2.0
 
 /// Common helper parsers used by multiple keyword parsers.
 use crate::{Base, Endian, NumberOrName, RuleParseError};
