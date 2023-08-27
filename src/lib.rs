@@ -323,7 +323,6 @@ pub fn parse_elements(input: &str) -> IResult<&str, Vec<Element>, RuleParseError
         preceded(multispace0, parsers::parse_array),
         preceded(multispace0, parsers::parse_array),
     ))(input)?;
-    dbg!(&src_addr);
     elements.push(Element::Action(action.into()));
     elements.push(Element::Protocol(proto.into()));
     elements.push(Element::SrcAddr(src_addr));
