@@ -83,7 +83,7 @@ pub fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, RuleParseErr
     // We might not always have an array, if not, parse a scalar and
     // return it as an array.
     if !input.starts_with('[') {
-        let (input, scalar) = parse_token(input)?;
+        let (input, scalar) = preceded(multispace0, is_not("\n\r\t "))(input)?;
         return Ok((input, vec![ArrayElement::String(scalar.to_string())]));
     }
 
@@ -441,6 +441,10 @@ mod test {
                 ]),
             ]
         );
+
+        let input = "ff02::fb";
+        let (_rem, array) = parse_array(input).unwrap();
+        assert_eq!(array, vec![ArrayElement::String("ff02::fb".to_string())]);
     }
 
     #[test]
