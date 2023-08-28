@@ -71,6 +71,15 @@ pub fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, RuleParseErr
     let mut depth = 0;
     let mut offset = 0;
 
+    // TODO: Handle negation
+    let mut _neg = false;
+
+    let mut input = input;
+    if input.starts_with('!') {
+        _neg = true;
+        input = &input[1..];
+    }
+
     // We might not always have an array, if not, parse a scalar and
     // return it as an array.
     if !input.starts_with('[') {
