@@ -147,6 +147,14 @@ fn main() {
     eprintln!("Parsed {} rules in {:?}", count, elapsed);
 }
 
+// Quick check to see if a buffer looks like it could be a rule.
+fn possible_rule(buf: &str) -> bool {
+    if !buf.contains(";") || !buf.contains(":") {
+        return false;
+    }
+    buf.contains("alert") || buf.contains("msg") || buf.contains("sid")
+}
+
 fn process_file<T: BufRead + Read>(reader: &mut T, opts: &Opts) -> usize {
     let mut lines = reader.lines();
     let mut count = 0;
@@ -160,9 +168,10 @@ fn process_file<T: BufRead + Read>(reader: &mut T, opts: &Opts) -> usize {
                 break;
             }
             Ok(Some(line)) => {
-                if line.is_empty() || line.starts_with('#') {
+                if line.is_empty() || !possible_rule(&line) {
                     continue;
                 }
+                let line = line.strip_prefix("#").unwrap_or(&line);
                 match suricatax_rule_parser::parse_elements(&line) {
                     Err(err) => {
                         eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
