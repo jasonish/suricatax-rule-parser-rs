@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Jason Ish <jason@codemonkey.net>"]
 
+# This requires a newer version of Rust than the library for clap,
+# etc.
+rust-version = "1.74.0"
+
 [dependencies]
 suricatax-rule-parser = { path = ".." }
 clap = { version = "4.3.10", features = ["derive"] }

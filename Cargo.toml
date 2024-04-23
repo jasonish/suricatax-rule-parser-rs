@@ -3,6 +3,7 @@ name = "suricatax-rule-parser"
 version = "0.1.0"
 authors = ["Jason Ish <jason@codemonkey.net>"]
 edition = "2021"
+rust-version = "1.63.0"
 
 [lib]
 crate-type = ["rlib", "staticlib", "cdylib"]
