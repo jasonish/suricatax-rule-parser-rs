@@ -149,7 +149,7 @@ fn main() {
 
 // Quick check to see if a buffer looks like it could be a rule.
 fn possible_rule(buf: &str) -> bool {
-    if !buf.contains(";") || !buf.contains(":") {
+    if !buf.contains(';') || !buf.contains(':') {
         return false;
     }
     buf.contains("alert") || buf.contains("msg") || buf.contains("sid")
@@ -171,8 +171,8 @@ fn process_file<T: BufRead + Read>(reader: &mut T, opts: &Opts) -> usize {
                 if line.is_empty() || !possible_rule(&line) {
                     continue;
                 }
-                let line = line.strip_prefix("#").unwrap_or(&line);
-                match suricatax_rule_parser::parse_elements(&line) {
+                let line = line.strip_prefix('#').unwrap_or(&line);
+                match suricatax_rule_parser::parse_elements(line) {
                     Err(err) => {
                         eprintln!("Failed to parse rule: {:?} -- {}", err, &line);
                     }
@@ -231,5 +231,5 @@ fn next_line<T: BufRead>(reader: &mut Lines<T>) -> Result<Option<String>, std::i
 }
 
 fn is_false(v: &bool) -> bool {
-    *v == false
+    !(*v)
 }

@@ -156,7 +156,7 @@ pub(crate) fn parse_option_value(input: &str) -> IResult<&str, &str, RuleParseEr
     // First jump over any leading whitespace.
     let (input, _) = multispace0(input)?;
 
-    for (_i, c) in input.chars().enumerate() {
+    for c in input.chars() {
         end += c.len_utf8();
         if c == '\\' {
             escaped = true;
@@ -167,6 +167,7 @@ pub(crate) fn parse_option_value(input: &str) -> IResult<&str, &str, RuleParseEr
             break;
         }
     }
+
     if !terminated {
         Err(nom::Err::Error(RuleParseError::UnterminatedRuleOptionValue))
     } else {
