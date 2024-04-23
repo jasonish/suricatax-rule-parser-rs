@@ -98,7 +98,8 @@ pub enum Element {
     ByteTest(ByteTest),
     Classtype(String),
     Content(Content),
-    Depth(u64),
+    UriContent(Content),
+    Depth(NumberOrName<u64>),
     Dsize(String),
     Distance(Distance),
     EndsWith(bool),
@@ -112,7 +113,7 @@ pub enum Element {
     Metadata(Vec<String>),
     NoAlert(bool),
     NoCase(bool),
-    Offset(u64),
+    Offset(NumberOrName<u64>),
     Pcre(Pcre),
     RawBytes(bool),
     Reference(String),
@@ -273,7 +274,8 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
             "byte_test" => Element::ByteTest(parsers::byte_test::parse_byte_test(value)?.1),
             "classtype" => Element::Classtype(value.to_owned()),
             "content" => Element::Content(parsers::parse_content(value)?.1),
-            "depth" => Element::Depth(parsers::parse_u64(value, "depth")?.1),
+            "uricontent" => Element::UriContent(parsers::parse_content(value)?.1),
+            "depth" => Element::Depth(common::parse_number_or_name(value)?.1),
             "distance" => {
                 Element::Distance(types::Distance(parsers::parse_count_or_name(value)?.1))
             }
@@ -284,7 +286,7 @@ pub(crate) fn parse_option_element(input: &str) -> IResult<&str, Element, RulePa
             "isdataat" => Element::IsDataAt(parsers::parse_isdataat(value)?.1),
             "metadata" => Element::Metadata(parse_metadata(value)?.1),
             "msg" => Element::Message(util::strip_quotes(value)),
-            "offset" => Element::Offset(parsers::parse_u64(value, "offset")?.1),
+            "offset" => Element::Offset(common::parse_number_or_name(value)?.1),
             "pcre" => Element::Pcre(
                 parsers::parse_pcre(value)
                     .map_err(|err| nom::Err::Error(RuleParseError::Pcre(format!("{}", err))))?
@@ -376,7 +378,7 @@ pub fn reduce_elements(
         let mut prev_content = None;
         for element in reduced.iter_mut().rev() {
             match element {
-                Element::Content(_) => {
+                Element::Content(_) | Element::UriContent(_) => {
                     prev_content = Some(element);
                     break;
                 }
@@ -395,7 +397,7 @@ pub fn reduce_elements(
             // Modifiers.
             Element::Depth(depth) => {
                 if let Some(Element::Content(content)) = prev_content {
-                    content.depth = depth;
+                    content.depth = Some(depth);
                 } else {
                     make_error(RuleParseError::Other(
                         "depth not preceded by content".into(),
@@ -429,18 +431,22 @@ pub fn reduce_elements(
                     ))?;
                 }
             }
-            Element::NoCase(nocase) => {
-                if let Some(Element::Content(content)) = prev_content {
+            Element::NoCase(nocase) => match prev_content {
+                Some(Element::Content(content)) => {
                     content.nocase = nocase;
-                } else {
+                }
+                Some(Element::UriContent(content)) => {
+                    content.nocase = nocase;
+                }
+                _ => {
                     make_error(RuleParseError::Other(
                         "nocase not preceded by content".into(),
                     ))?;
                 }
-            }
+            },
             Element::Offset(offset) => {
                 if let Some(Element::Content(content)) = prev_content {
-                    content.offset = offset;
+                    content.offset = Some(offset);
                 } else {
                     make_error(RuleParseError::Other(
                         "offset not preceded by content".into(),
@@ -570,5 +576,8 @@ mod test {
         parse_elements(r#"alert http $EXTERNAL_NET any -> $HTTP_SERVERS any (msg:"ET WEB_SPECIFIC_APPS ProjectButler RFI attempt"; flow:established,to_server; http.uri; content:"/pda_projects.php?offset=http\:"; nocase; reference:url,www.sans.org/top20/; reference:url,www.packetstormsecurity.org/0908-exploits/projectbutler-rfi.txt; reference:url,doc.emergingthreats.net/2009887; classtype:web-application-attack; sid:2009887; rev:7; metadata:created_at 2010_07_30, former_category WEB_SPECIFIC_APPS, updated_at 2020_09_10;)"#).unwrap();
 
         parse_elements(r#"alert ip $HOME_NET any -> $EXTERNAL_NET any (msg:"GPL ATTACK_RESPONSE id check returned userid"; content:"uid="; byte_test:5,<,65537,0,relative,string; content:" gid="; within:15; byte_test:5,<,65537,0,relative,string; classtype:bad-unknown; sid:2101882; rev:11; metadata:created_at 2010_09_23, updated_at 2010_09_23;)"#).unwrap();
+
+        let buf = r#" alert ip $HOME_NET any -> $EXTERNAL_NET any (msg:"GPL ATTACK_RESPONSE id check returned userid"; content:"uid="; byte_test:5,<,65537,0,relative,string; content:" gid="; within:15; byte_test:5,<,65537,0,relative,string; classtype:bad-unknown; sid:2101882; rev:11; metadata:created_at 2010_09_23, updated_at 2010_09_23;)"#;
+        let (_rem, _elements) = parse_elements(buf).unwrap();
     }
 }

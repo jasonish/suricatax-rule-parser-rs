@@ -152,7 +152,7 @@ pub struct Content {
     // Modifiers that can exist once per content and make sense to pull into the
     // context object.
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
-    pub depth: u64,
+    pub depth: Option<NumberOrName<u64>>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
     pub distance: Distance,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
@@ -162,7 +162,7 @@ pub struct Content {
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
     pub nocase: bool,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
-    pub offset: u64,
+    pub offset: Option<NumberOrName<u64>>,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
     pub startswith: bool,
     #[cfg_attr(feature = "serde_support", serde(skip_serializing_if = "is_default"))]
