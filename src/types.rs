@@ -111,7 +111,7 @@ pub enum ByteMathOperator {
 pub struct ByteTest {
     pub bytes: usize,
     pub negate: bool,
-    pub op: ByteTestOperator,
+    pub op: Option<ByteTestOperator>,
     pub value: NumberOrName<u64>,
     pub offset: NumberOrName<i32>,
     pub relative: bool,

@@ -32,7 +32,7 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
     let (input, bytes) = parse_number::<usize>(input)?;
     let (input, _) = parse_tag(",")(input)?;
     let (input, negate) = opt(tag("!"))(input)?;
-    let (input, op) = parse_op(input)?;
+    let (input, op) = opt(parse_op)(input)?;
     let (input, _) = parse_tag(",")(input)?;
     let (input, value) = parse_number_or_name::<u64>(input)?;
     let (input, _) = parse_tag(",")(input)?;
@@ -120,7 +120,7 @@ mod test {
             ByteTest {
                 bytes: 4,
                 negate: false,
-                op: ByteTestOperator::Eq,
+                op: Some(ByteTestOperator::Eq),
                 value: NumberOrName::Number(1337),
                 offset: NumberOrName::Number(1),
                 relative: true,
@@ -140,7 +140,7 @@ mod test {
             ByteTest {
                 bytes: 8,
                 negate: false,
-                op: ByteTestOperator::Eq,
+                op: Some(ByteTestOperator::Eq),
                 value: NumberOrName::Number(0xdeadbeef),
                 offset: NumberOrName::Number(0),
                 relative: false,
@@ -160,7 +160,7 @@ mod test {
             ByteTest {
                 bytes: 1,
                 negate: true,
-                op: ByteTestOperator::Eq,
+                op: Some(ByteTestOperator::Eq),
                 value: NumberOrName::Number(0x20),
                 offset: NumberOrName::Number(0),
                 relative: true,
@@ -180,7 +180,7 @@ mod test {
             ByteTest {
                 bytes: 1,
                 negate: true,
-                op: ByteTestOperator::And,
+                op: Some(ByteTestOperator::And),
                 value: NumberOrName::Number(0x40),
                 offset: NumberOrName::Number(2),
                 relative: false,
@@ -200,9 +200,29 @@ mod test {
             ByteTest {
                 bytes: 4,
                 negate: false,
-                op: ByteTestOperator::Gt,
+                op: Some(ByteTestOperator::Gt),
                 value: NumberOrName::Number(128),
                 offset: NumberOrName::Number(20),
+                relative: true,
+                endian: Endian::Little,
+                string: false,
+                hex: false,
+                dec: false,
+                oct: false,
+                dce: false,
+                bitmask: 0,
+            }
+        );
+
+        let (_, bt) = parse_byte_test("2,!,0xFFFF,6,relative,little").unwrap();
+        assert_eq!(
+            bt,
+            ByteTest {
+                bytes: 2,
+                negate: true,
+                op: None,
+                value: NumberOrName::Number(0xffff),
+                offset: NumberOrName::Number(6),
                 relative: true,
                 endian: Endian::Little,
                 string: false,
