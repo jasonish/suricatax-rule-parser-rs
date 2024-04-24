@@ -1,18 +1,22 @@
 // SPDX-FileCopyrightText: (C) 2021 Jason Ish <jason@codemonkey.net>
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use crate::common::{parse_number, parse_number_or_name, parse_tag, parse_token};
-use crate::{ByteJump, Endian, RuleParseError};
+use crate::{
+    options::ByteJump,
+    parsers::{parse_token, Endian},
+};
 use nom::bytes::complete::tag;
 use nom::character::complete::multispace0;
 use nom::sequence::preceded;
 use nom::Err::Error;
 use nom::IResult;
 
-pub(crate) fn parse_byte_jump(input: &str) -> IResult<&str, ByteJump, RuleParseError<&str>> {
+use super::{parse_number, parse_number_or_reference, parse_tag, ErrorKind, ParseError};
+
+pub(crate) fn parse_byte_jump(input: &str) -> IResult<&str, ByteJump, ParseError<&str>> {
     let (input, byte_count) = parse_number::<usize>(input)?;
     let (input, _) = parse_tag(",")(input)?;
-    let (input, offset) = parse_number_or_name::<i32>(input)?;
+    let (input, offset) = parse_number_or_reference::<i32>(input)?;
 
     let mut byte_jump = ByteJump {
         count: byte_count,
@@ -26,11 +30,6 @@ pub(crate) fn parse_byte_jump(input: &str) -> IResult<&str, ByteJump, RuleParseE
             tag(","),
             preceded(multispace0, nom::bytes::complete::is_not(",")),
         )(input)?;
-
-        // Inner utility function for easy error creation.
-        fn make_error(reason: String) -> nom::Err<RuleParseError<&'static str>> {
-            Error(RuleParseError::InvalidByteJump(reason))
-        }
 
         for value in values {
             let (value, name) = parse_token(value)?;
@@ -81,7 +80,10 @@ pub(crate) fn parse_byte_jump(input: &str) -> IResult<&str, ByteJump, RuleParseE
                     byte_jump.bitmask = bitmask;
                 }
                 _ => {
-                    return Err(make_error(format!("unknown parameter: {}", name)));
+                    return Err(Error(ParseError {
+                        input: value,
+                        kind: ErrorKind::Other("unknown_byte_jump_option"),
+                    }));
                 }
             }
         }
@@ -92,8 +94,9 @@ pub(crate) fn parse_byte_jump(input: &str) -> IResult<&str, ByteJump, RuleParseE
 
 #[cfg(test)]
 mod test {
+    use crate::parsers::NumberOrReference;
+
     use super::*;
-    use crate::NumberOrName;
 
     #[test]
     fn test_parse_byte_jump() {
@@ -103,7 +106,7 @@ mod test {
         let input = "4,12,relative,little,multiplier 2";
         let (_, byte_jump) = parse_byte_jump(input).unwrap();
         assert_eq!(byte_jump.count, 4);
-        assert_eq!(byte_jump.offset, NumberOrName::Number(12));
+        assert_eq!(byte_jump.offset, NumberOrReference::Number(12));
         assert!(byte_jump.relative);
         assert_eq!(byte_jump.endian, Endian::Little);
         assert_eq!(byte_jump.multiplier, 2);

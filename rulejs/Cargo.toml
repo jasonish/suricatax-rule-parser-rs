@@ -1,6 +1,6 @@
 [package]
-name = "rjs"
-version = "0.1.0"
+name = "rulejs"
+version = "0.2.0"
 edition = "2021"
 authors = ["Jason Ish <jason@codemonkey.net>"]
 

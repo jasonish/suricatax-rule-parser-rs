@@ -1,14 +1,18 @@
 // SPDX-FileCopyrightText: (C) 2022 Jason Ish <jason@codemonkey.net>
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use crate::common::{parse_number, parse_number_or_name, parse_tag, parse_token};
-use crate::{ByteTest, ByteTestOperator, Endian, RuleParseError};
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
 use nom::Err::Error;
 use nom::IResult;
 
-fn parse_op(input: &str) -> IResult<&str, ByteTestOperator, RuleParseError<&str>> {
+use super::{
+    parse_number, parse_number_or_reference, parse_tag, parse_token, ErrorKind, ParseError,
+};
+use crate::options::ByteTest;
+use crate::types::*;
+
+fn parse_op(input: &str) -> IResult<&str, ByteTestOperator, ParseError<&str>> {
     let (input, op) = parse_token(input)?;
     let op = match op {
         "<" => ByteTestOperator::Lt,
@@ -19,24 +23,24 @@ fn parse_op(input: &str) -> IResult<&str, ByteTestOperator, RuleParseError<&str>
         "&" => ByteTestOperator::And,
         "^" => ByteTestOperator::Or,
         _ => {
-            return Err(nom::Err::Error(RuleParseError::Other(format!(
-                "invalid byte test operator: {}",
-                op
-            ))));
+            return Err(nom::Err::Error(ParseError {
+                input,
+                kind: ErrorKind::Other("bad byte test operator"),
+            }));
         }
     };
     Ok((input, op))
 }
 
-pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&str>> {
+pub(crate) fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, ParseError<&str>> {
     let (input, bytes) = parse_number::<usize>(input)?;
     let (input, _) = parse_tag(",")(input)?;
     let (input, negate) = opt(tag("!"))(input)?;
     let (input, op) = opt(parse_op)(input)?;
     let (input, _) = parse_tag(",")(input)?;
-    let (input, value) = parse_number_or_name::<u64>(input)?;
+    let (input, value) = parse_number_or_reference::<u64>(input)?;
     let (input, _) = parse_tag(",")(input)?;
-    let (input, offset) = parse_number_or_name::<i32>(input)?;
+    let (input, offset) = parse_number_or_reference::<i32>(input)?;
 
     let mut relative = false;
     let mut endian = Endian::Big;
@@ -77,7 +81,10 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
                 endian = Endian::Little;
             }
             _ => {
-                return Err(Error(RuleParseError::UnknownOption(opt.to_string())));
+                return Err(Error(ParseError {
+                    input: i,
+                    kind: ErrorKind::UnexpectedCharacter,
+                }))
             }
         }
         input = i;
@@ -106,7 +113,6 @@ pub fn parse_byte_test(input: &str) -> IResult<&str, ByteTest, RuleParseError<&s
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::NumberOrName;
 
     #[test]
     fn test_parse_byte_test() {
@@ -121,8 +127,8 @@ mod test {
                 bytes: 4,
                 negate: false,
                 op: Some(ByteTestOperator::Eq),
-                value: NumberOrName::Number(1337),
-                offset: NumberOrName::Number(1),
+                value: NumberOrReference::Number(1337),
+                offset: NumberOrReference::Number(1),
                 relative: true,
                 endian: Endian::Big,
                 string: true,
@@ -141,8 +147,8 @@ mod test {
                 bytes: 8,
                 negate: false,
                 op: Some(ByteTestOperator::Eq),
-                value: NumberOrName::Number(0xdeadbeef),
-                offset: NumberOrName::Number(0),
+                value: NumberOrReference::Number(0xdeadbeef),
+                offset: NumberOrReference::Number(0),
                 relative: false,
                 endian: Endian::Big,
                 string: true,
@@ -161,8 +167,8 @@ mod test {
                 bytes: 1,
                 negate: true,
                 op: Some(ByteTestOperator::Eq),
-                value: NumberOrName::Number(0x20),
-                offset: NumberOrName::Number(0),
+                value: NumberOrReference::Number(0x20),
+                offset: NumberOrReference::Number(0),
                 relative: true,
                 endian: Endian::Big,
                 string: true,
@@ -181,8 +187,8 @@ mod test {
                 bytes: 1,
                 negate: true,
                 op: Some(ByteTestOperator::And),
-                value: NumberOrName::Number(0x40),
-                offset: NumberOrName::Number(2),
+                value: NumberOrReference::Number(0x40),
+                offset: NumberOrReference::Number(2),
                 relative: false,
                 endian: Endian::Big,
                 string: false,
@@ -201,8 +207,8 @@ mod test {
                 bytes: 4,
                 negate: false,
                 op: Some(ByteTestOperator::Gt),
-                value: NumberOrName::Number(128),
-                offset: NumberOrName::Number(20),
+                value: NumberOrReference::Number(128),
+                offset: NumberOrReference::Number(20),
                 relative: true,
                 endian: Endian::Little,
                 string: false,
@@ -221,8 +227,8 @@ mod test {
                 bytes: 2,
                 negate: true,
                 op: None,
-                value: NumberOrName::Number(0xffff),
-                offset: NumberOrName::Number(6),
+                value: NumberOrReference::Number(0xffff),
+                offset: NumberOrReference::Number(6),
                 relative: true,
                 endian: Endian::Little,
                 string: false,

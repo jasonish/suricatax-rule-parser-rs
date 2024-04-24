@@ -1,180 +1,79 @@
 // SPDX-FileCopyrightText: (C) 2021 Jason Ish <jason@codemonkey.net>
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use std::ffi::{c_void, CStr, CString};
+//! FFI for the rule parser.
+//!
+//! Experimental: This may never get finished and may better live
+//! directly in Suricata should Suricata if ever use this crate.
+
+use std::cell::RefCell;
+use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-use crate::Flowbits;
-use crate::{Element, FlowbitCommand};
-
-#[repr(u16)]
-pub enum ElementTag {
-    Action,
-    Protocol,
-    SrcAddr,
-    SrcPort,
-    Direction,
-    DstAddr,
-    DstPort,
-    ByteJump,
-    Classtype,
-    Content,
-    Depth,
-    Dsize,
-    Distance,
-    EndsWith,
-    FastPattern,
-    FileData,
-    Flow,
-    Flowbits,
-    FtpBounce,
-    IsDataAt,
-    Message,
-    Metadata,
-    NoAlert,
-    NoCase,
-    Offset,
-    Pcre,
-    RawBytes,
-    Reference,
-    Rev,
-    Sid,
-    StartsWith,
-    Within,
-    GenericOption,
+pub struct CRule {
+    _inner: crate::Rule,
 }
 
-// This is more or less here to make sure ElementTag stays in sync with Element.
-impl From<&Element> for ElementTag {
-    fn from(e: &Element) -> ElementTag {
-        match e {
-            // Header elements.
-            Element::Action(_) => Self::Action,
-            Element::Protocol(_) => Self::Protocol,
-            Element::SrcAddr(_) => Self::SrcAddr,
-            Element::SrcPort(_) => Self::SrcPort,
-            Element::Direction(_) => Self::Direction,
-            Element::DstAddr(_) => Self::DstAddr,
-            Element::DstPort(_) => Self::DstPort,
-
-            // Option elements in alphabetical order.
-            Element::Flowbits(_) => Self::Flowbits,
-
-            _ => unimplemented!(),
-        }
-    }
+thread_local! {
+    static LAST_ERROR: RefCell<CString> = RefCell::new(CString::new("").unwrap());
 }
 
-#[repr(C)]
-pub struct CElement {
-    pub tag: ElementTag,
-    pub val: *const c_void,
+fn set_last_error(msg: &str) -> *const c_char {
+    let msg = CString::new(msg).unwrap();
+    LAST_ERROR.with(|le| {
+        *le.borrow_mut() = msg.clone();
+        le.borrow().as_ptr()
+    })
 }
 
-impl Drop for CElement {
-    fn drop(&mut self) {
-        unsafe {
-            match self.tag {
-                ElementTag::Action => {
-                    let _ = CString::from_raw(self.val as *mut c_char);
-                }
-                ElementTag::Flowbits => {
-                    let _ = Box::from_raw(self.val as *mut CFlowbits);
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-#[repr(C)]
-pub struct CFlowbits {
-    pub command: FlowbitCommand,
-    pub size: usize,
-    pub names: *const *const c_char,
-    pub __names: *const c_void,
-}
-
-impl From<&Flowbits> for CFlowbits {
-    fn from(f: &Flowbits) -> Self {
-        // First create an array of CStrings as our backing store.
-        let names: Vec<CString> = f
-            .names
-            .iter()
-            .map(|n| CString::new(n.to_string()).unwrap())
-            .collect();
-        // Now create an array of c_char * type strings.
-        let cnames: Vec<*const c_char> = names.iter().map(|n| n.as_ptr()).collect();
-        let cflowbits = Self {
-            command: f.command.clone(),
-            size: names.len(),
-            names: cnames.as_ptr() as *const *const c_char,
-            __names: names.as_ptr() as *const c_void,
-        };
-        dbg!(&cflowbits);
-        // Forget about the 2 arrays, they'll be remembered in the Drop impl.
-        std::mem::forget(cnames);
-        std::mem::forget(names);
-        cflowbits
-    }
-}
-
-impl Drop for CFlowbits {
-    fn drop(&mut self) {
-        unsafe {
-            Vec::from_raw_parts(self.__names as *mut CString, self.size, self.size);
-            Vec::from_raw_parts(self.names as *mut *const c_char, self.size, self.size);
-        }
-    }
-}
-
-/// # Safety
-///
-/// It's FFI!
 #[no_mangle]
-pub unsafe extern "C" fn srp_parse_elements(
-    input: *const c_char,
-    size: *mut usize,
-) -> *const CElement {
-    let input = CStr::from_ptr(input).to_str().unwrap();
-    let (_, elements) = crate::parse_elements(input).unwrap();
-    let (_, elements) = crate::reduce_elements(elements).unwrap();
-
-    // Now convert the elements to C style structs.
-    let mut celements = Vec::new();
-    for element in &elements {
-        match element {
-            Element::Action(action) => {
-                let ce = CElement {
-                    tag: element.into(),
-                    val: CString::new(action.to_string()).unwrap().into_raw() as *const c_void,
-                };
-                celements.push(ce);
+pub unsafe extern "C" fn scx_parse_rule(
+    buf: *const c_char,
+    errmsg: *mut *const c_char,
+) -> *mut CRule {
+    let buf = match CStr::from_ptr(buf).to_str() {
+        Ok(buf) => buf,
+        Err(err) => {
+            if !errmsg.is_null() {
+                *errmsg = set_last_error(&format!("{:?}", err));
             }
-            Element::Flowbits(flowbits) => {
-                let tag: ElementTag = element.into();
-                let cf: CFlowbits = flowbits.into();
-                let ce = CElement {
-                    tag,
-                    val: Box::into_raw(Box::new(cf)) as *const c_void,
-                };
-                celements.push(ce);
+            return std::ptr::null_mut();
+        }
+    };
+    match crate::parse_rule(buf) {
+        Ok(rule) => {
+            let rule = Box::new(CRule { _inner: rule });
+            Box::into_raw(rule)
+        }
+        Err(err) => {
+            if !errmsg.is_null() {
+                *errmsg = set_last_error(&format!("{:?}", err));
             }
-            _ => {}
+            std::ptr::null_mut()
         }
     }
-    celements.shrink_to_fit();
-    *size = celements.len();
-    let r = celements.as_ptr() as *const CElement;
-    std::mem::forget(celements);
-    r
 }
 
-/// # Safety
-///
-/// It's FFI!
-#[no_mangle]
-pub unsafe extern "C" fn srp_free_elements(elements: *const CElement, size: usize) {
-    let _elements = Vec::from_raw_parts(elements as *mut CElement, size, size);
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_rule() {
+        unsafe {
+            let mut err_msg: *const c_char = std::ptr::null_mut();
+
+            let input =
+                CString::new("alert tcp any any -> any any (msg:\"test\"; sid:1;)").unwrap();
+            let rule = scx_parse_rule(input.as_ptr(), &mut err_msg);
+            assert!(!rule.is_null());
+
+            let input =
+                CString::new("alert tcp any any => any any (msg:\"test\"; sid:1;)").unwrap();
+            let rule = scx_parse_rule(input.as_ptr(), &mut err_msg);
+            let err_msg = std::ffi::CStr::from_ptr(err_msg).to_str().unwrap();
+            assert!(rule.is_null());
+            assert!(err_msg.contains("direction"));
+        }
+    }
 }
