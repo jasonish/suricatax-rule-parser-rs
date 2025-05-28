@@ -12,7 +12,7 @@ use types::{ArrayElement, Direction, NumberOrReference};
 mod ffi;
 pub mod loader;
 mod options;
-mod parser;
+pub mod parser;
 mod parsers;
 mod types;
 mod util;

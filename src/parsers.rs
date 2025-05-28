@@ -231,6 +231,38 @@ pub(crate) fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, Parse
     }))
 }
 
+/// Scan an array returning a String of the array contents.
+pub(crate) fn scan_array(input: &str) -> IResult<&str, &str, ParseError<&str>> {
+    let input = input.trim_start();
+
+    // We might not always have an array, if not, parse a scalar.
+    if !input.starts_with('[') {
+        let (input, scalar) = preceded(multispace0, is_not("\n\r\t "))(input)?;
+        return Ok((input, scalar));
+    }
+
+    let mut depth = 0;
+    let mut offset = 0;
+
+    for c in input.chars() {
+        offset += c.len_utf8();
+        match c {
+            '[' => {
+                depth += 1;
+            }
+            ']' => {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok((&input[offset..], &input[0..offset]))
+}
+
 /// Parse the value for an option.
 ///
 /// This parser expects the input to be the first character after the ':'
@@ -643,6 +675,46 @@ mod test {
                 input: "[[asdf,asdf]"
             })
         );
+    }
+
+    #[test]
+    fn test_scan_array() {
+        let input = "[a]xxx";
+        let (rem, array) = scan_array(input).unwrap();
+        assert_eq!(rem, "xxx");
+        assert_eq!(array, "[a]");
+
+        let input = "[a,bbb]xxx";
+        let (rem, array) = parse_array(input).unwrap();
+        assert_eq!(rem, "xxx");
+        assert_eq!(
+            array,
+            vec![
+                ArrayElement::String("a".to_string()),
+                ArrayElement::String("bbb".to_string())
+            ]
+        );
+
+        let input = "[a,bbb]xxx";
+        let (rem, array) = scan_array(input).unwrap();
+        assert_eq!(rem, "xxx");
+        assert_eq!(array, "[a,bbb]");
+
+        let input = "[a,[bbb,ccc,[xxx]],ddd,[eee,fff]]aaa";
+        let (rem, array) = scan_array(input).unwrap();
+        assert_eq!(rem, "aaa");
+        assert_eq!(array, "[a,[bbb,ccc,[xxx]],ddd,[eee,fff]]");
+
+        let input = "ff02::fb 8080";
+        let (rem, array) = scan_array(input).unwrap();
+        assert_eq!(rem, " 8080");
+        assert_eq!(array, "ff02::fb");
+
+        // The array scanner does not treat this as an error. Perhaps
+        // it should.
+        let (rem, array) = scan_array("[a").unwrap();
+        assert_eq!(rem, "");
+        assert_eq!(array, "[a");
     }
 
     #[test]
