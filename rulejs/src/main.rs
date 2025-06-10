@@ -3,7 +3,11 @@
 
 use clap::Parser;
 
-use suricatax_rule_parser::{loader, Parsed};
+use serde::Serialize;
+use suricatax_rule_parser::{
+    loader,
+    parser::{RuleScanEvent, RuleScanner},
+};
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -21,6 +25,24 @@ struct Args {
 
     /// Filenames to parse, empty for stdin.
     filenames: Vec<String>,
+}
+
+#[derive(Default, Debug, Serialize)]
+struct PrettyRule {
+    action: String,
+    proto: String,
+    src_ip: String,
+    src_port: String,
+    direction: String,
+    dest_ip: String,
+    dest_port: String,
+    option: Vec<PrettyRuleOption>,
+}
+
+#[derive(Default, Debug, Serialize)]
+struct PrettyRuleOption {
+    name: String,
+    value: Option<String>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -58,30 +80,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
 
-            // Finally parse the rule.
-            match suricatax_rule_parser::parse_rule(line) {
-                Ok(rule) => {
-                    if !args.quiet {
-                        println!("{}", serde_json::to_string(&rule)?);
-                    }
-
-                    if args.strict {
-                        for option in rule.options {
-                            if option.parsed == Parsed::Unknown {
-                                println!("Unknown option: {}:{:?}", option.name, option.value);
-                            }
+            let scanner = RuleScanner::new(line);
+            let mut rule = PrettyRule::default();
+            for event in scanner {
+                match event {
+                    Ok(event) => match event {
+                        RuleScanEvent::Action(action) => {
+                            rule.action = action.to_string();
                         }
-                    }
-
-                    count += 1;
-                }
-                Err(e) => {
-                    eprintln!("Error parsing rule: {:?} -- {}", e, line);
-                    if args.fail {
-                        std::process::exit(1);
+                        RuleScanEvent::Protocol(proto) => {
+                            rule.proto = proto.to_string();
+                        }
+                        RuleScanEvent::SourceIp(src_ip) => {
+                            rule.src_ip = src_ip.to_string();
+                        }
+                        RuleScanEvent::SourcePort(dest_ip) => {
+                            rule.src_port = dest_ip.to_string();
+                        }
+                        RuleScanEvent::Direction(dir) => {
+                            rule.direction = dir.to_string();
+                        }
+                        RuleScanEvent::DestIp(ip) => {
+                            rule.dest_ip = ip.to_string();
+                        }
+                        RuleScanEvent::DestPort(port) => {
+                            rule.dest_port = port.to_string();
+                        }
+                        RuleScanEvent::StartOfOptions(_) => {}
+                        RuleScanEvent::Option { name, value } => {
+                            rule.option.push(PrettyRuleOption { name, value });
+                        }
+                        RuleScanEvent::EndOfOptions(_) => {}
+                    },
+                    Err(e) => {
+                        eprintln!("Error scanning rule: {:?} -- {}", e, line);
+                        if args.fail {
+                            std::process::exit(1);
+                        }
                     }
                 }
             }
+            println!("{}", serde_json::to_string(&rule)?);
+            count += 1;
         }
     }
 
