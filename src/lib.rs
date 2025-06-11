@@ -4,12 +4,10 @@
 use nom::Offset;
 use serde::{Deserialize, Serialize};
 
-use options::{ByteJump, ByteTest, Content, Flow, Flowbits, IsDataAt, Pcre, Reference};
-use parsers::ParseError;
+use parsers::{ByteJump, ByteTest, Content, Flow, Flowbits, IsDataAt, Pcre, Reference, ParseError};
 use types::{ArrayElement, Direction, NumberOrReference};
 
 pub mod loader;
-mod options;
 pub mod parser;
 mod parsers;
 mod types;
