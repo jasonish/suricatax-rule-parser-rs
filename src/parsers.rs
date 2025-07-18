@@ -121,6 +121,77 @@ fn parse_quoted_string(input: &str) -> IResult<&str, String, ParseError<&str>> {
     delimited(tag("\""), escaped_or_empty, tag("\""))(input)
 }
 
+/// Checks if the last element of a vector matches a given value
+///
+/// # Arguments
+/// - `$stack`: Vector to check (must implement `.last()`)
+/// - `$check_value`: Value to compare against the last element
+/// - `$if_eq`: Token tree to execute if last element matches
+/// - `$if_ne`: Token tree to execute if no match or vector is empty
+///
+/// # Return value
+/// Based on the comparison result, return the execution result of the `$if_eq` or `$if_ne` code block
+macro_rules! stack_check_last {
+    ($stack: expr, $check_value: expr, $if_eq: tt, $if_ne: tt) => {
+        {
+            let mut __last_eq_value__ = false;
+            if let Some(val) = $stack.last() {
+                if $check_value == *val {
+                    __last_eq_value__ = true;
+                }
+            }
+            if __last_eq_value__ {
+                $if_eq
+            } else {
+                $if_ne
+            }
+        }
+    };
+}
+
+/// Processes accumulated tokens and adds them to the parser stack
+///
+/// # Parameters
+/// - `input`: Current input string (for error reporting)
+/// - `depth`: Current parsing depth level
+/// - `depth_when_not`: Stack tracking special negation depths
+/// - `token`: Accumulated string token (cleared after processing)
+/// - `stack`: Main parser stack (nested array structure)
+///
+/// # Returns
+/// - `Ok(((), ()))` on successful processing
+/// - `Err(ParseError)` if:
+///    - Token exists but stack is empty (unterminated array)
+#[inline]
+fn check_token_and_add<'a>(input: &'a str,
+                           depth: i32,
+                           depth_when_not: &mut Vec<i32>,
+                           token: &mut String,
+                           stack: &mut Vec<Vec<ArrayElement>>) -> IResult<(), (), ParseError<&'a str>> {
+    if !token.is_empty() {
+        if let Some(top) = stack.last_mut() {
+            // If stack has top level:
+            //    - Uses `stack_check_last!` to determine element type:
+            //      * Match: Creates NOT element and pops depth_when_not
+            //      * No match: Creates normal String element
+            //    - Clears token buffer
+            top.push(stack_check_last!(depth_when_not, depth, {
+                        depth_when_not.pop();
+                         ArrayElement::not_string(token.clone())
+                    }, {
+                         ArrayElement::String(token.clone())
+                    }));
+            token.clear();
+        } else {
+            return Err(nom::Err::Error(ParseError {
+                kind: ErrorKind::UnterminatedArray,
+                input,
+            }));
+        }
+    }
+    Ok(((), ()))
+}
+
 pub(crate) fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, ParseError<&str>> {
     // Use a stack to avoid recursion. Should probably still set a
     // size bound on it.
@@ -129,12 +200,11 @@ pub(crate) fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, Parse
     let mut depth = 0;
     let mut offset = 0;
 
-    // TODO: Handle negation
-    let mut _neg = false;
+    let mut neg = false;
 
     let mut input = input.trim_start();
     if input.starts_with('!') {
-        _neg = true;
+        neg = true;
         input = &input[1..];
     }
 
@@ -142,34 +212,35 @@ pub(crate) fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, Parse
     // return it as an array.
     if !input.starts_with('[') {
         let (input, scalar) = preceded(multispace0, is_not("\n\r\t "))(input)?;
-        return Ok((input, vec![ArrayElement::String(scalar.to_string())]));
+        let element = if neg {
+            ArrayElement::not_string(scalar.to_string())
+        } else {
+            ArrayElement::String(scalar.to_string())
+        };
+        return Ok((input, vec![element]));
     }
 
+    let mut depth_when_not: Vec<i32> = Vec::with_capacity(5);
     for c in input.chars() {
         offset += c.len_utf8();
         match c {
             '[' => {
                 depth += 1;
-                stack.push(Vec::new())
+                stack.push(Vec::new());
             }
             ']' => {
-                if !token.is_empty() {
-                    if let Some(top) = stack.last_mut() {
-                        top.push(ArrayElement::String(token.clone()));
-                        token.clear();
-                    } else {
-                        return Err(nom::Err::Error(ParseError {
-                            kind: ErrorKind::UnterminatedArray,
-                            input,
-                        }));
-                    }
-                }
+                check_token_and_add(input, depth, &mut depth_when_not, &mut token, &mut stack)?;
                 let last = stack.pop().ok_or(nom::Err::Error(ParseError {
                     kind: ErrorKind::UnterminatedArray,
                     input,
                 }))?;
                 if let Some(top) = stack.last_mut() {
-                    top.push(ArrayElement::Array(last));
+                    top.push(stack_check_last!(depth_when_not, depth - 1, {
+                        depth_when_not.pop();
+                        ArrayElement::not_array(last)
+                    }, {
+                        ArrayElement::Array(last)
+                    }));
                 } else {
                     return Err(nom::Err::Error(ParseError {
                         kind: ErrorKind::UnterminatedArray,
@@ -184,17 +255,13 @@ pub(crate) fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, Parse
                 }
             }
             ',' => {
-                if !token.is_empty() {
-                    if let Some(top) = stack.last_mut() {
-                        top.push(ArrayElement::String(token.clone()));
-                        token.clear();
-                    } else {
-                        return Err(nom::Err::Error(ParseError {
-                            kind: ErrorKind::UnterminatedArray,
-                            input,
-                        }));
-                    }
-                }
+                check_token_and_add(input, depth, &mut depth_when_not, &mut token, &mut stack)?;
+            }
+            ' ' | '\t' => {
+                continue
+            }
+            '!' if token.is_empty() => {
+                depth_when_not.push(depth);
             }
             _ => token.push(c),
         }
@@ -221,6 +288,11 @@ pub(crate) fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, Parse
     // Double unwrap as we used a stack to avoid recursion.
     if let Some(mut stack) = stack.pop() {
         if let Some(ArrayElement::Array(stack)) = stack.pop() {
+            let stack = if neg {
+                vec![ArrayElement::not_array(stack)]
+            } else {
+                stack
+            };
             return Ok((&input[offset..], stack));
         }
     }

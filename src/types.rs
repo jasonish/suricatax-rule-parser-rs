@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub enum ArrayElement {
     String(String),
     Array(Vec<ArrayElement>),
+    Not(Box<ArrayElement>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -97,5 +98,17 @@ pub enum NumberOrReference<T> {
 impl Default for NumberOrReference<i32> {
     fn default() -> Self {
         NumberOrReference::Number(0)
+    }
+}
+
+impl ArrayElement {
+    #[inline]
+    pub fn not_string(string: String) -> Self {
+        ArrayElement::Not(Box::new(ArrayElement::String(string)))
+    }
+
+    #[inline]
+    pub fn not_array(arr: Vec<ArrayElement>) -> Self {
+        ArrayElement::Not(Box::new(ArrayElement::Array(arr)))
     }
 }
