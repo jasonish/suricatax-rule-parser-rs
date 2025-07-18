@@ -334,7 +334,7 @@ mod test {
 
     #[test]
     fn test_rule_parser_not_operator_iterator() {
-        let rule = r#"alert tcp [10.0.0.0/24, !10.0.0.5, [![10.2.0.0/24, !10.0.2.5], !10.0.3.5]] ![3,4] -> !10.0.1.5 [1:80,![2,4] ] (msg:"test"; metadata:1,2,3;)"#;
+        let rule = r#"alert tcp [10.0.0.0/24, !10. 0.0.5  , [![10.2.0.0/24, !10.0.2.5], !10.0.3.5]] ![3,4] -> !10.0.1.5 [1:80,![2,4] ] (msg:"test"; metadata:1,2,3;)"#;
         let iter = RuleParser::new(rule);
         let mut state = RuleParserState::Action;
         for element in iter {
@@ -356,7 +356,7 @@ mod test {
                     assert_eq!(src_ip,
                                vec![
                                     ArrayElement::String("10.0.0.0/24".to_string()),
-                                    ArrayElement::not_string("10.0.0.5".to_string()),
+                                    ArrayElement::not_string("10. 0.0.5".to_string()),
                                     ArrayElement::Array(vec![
                                         ArrayElement::not_array(vec![
                                             ArrayElement::String("10.2.0.0/24".to_string()),

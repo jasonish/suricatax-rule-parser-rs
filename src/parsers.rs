@@ -169,6 +169,7 @@ fn check_token_and_add<'a>(input: &'a str,
                            token: &mut String,
                            stack: &mut Vec<Vec<ArrayElement>>) -> IResult<(), (), ParseError<&'a str>> {
     if !token.is_empty() {
+        let token_str = token.trim_end();
         if let Some(top) = stack.last_mut() {
             // If stack has top level:
             //    - Uses `stack_check_last!` to determine element type:
@@ -177,9 +178,9 @@ fn check_token_and_add<'a>(input: &'a str,
             //    - Clears token buffer
             top.push(stack_check_last!(depth_when_not, depth, {
                         depth_when_not.pop();
-                         ArrayElement::not_string(token.clone())
+                         ArrayElement::not_string(token_str.to_string())
                     }, {
-                         ArrayElement::String(token.clone())
+                         ArrayElement::String(token_str.to_string())
                     }));
             token.clear();
         } else {
@@ -257,7 +258,7 @@ pub(crate) fn parse_array(input: &str) -> IResult<&str, Vec<ArrayElement>, Parse
             ',' => {
                 check_token_and_add(input, depth, &mut depth_when_not, &mut token, &mut stack)?;
             }
-            ' ' | '\t' => {
+            ' ' | '\t' if token.is_empty() => {
                 continue
             }
             '!' if token.is_empty() => {
