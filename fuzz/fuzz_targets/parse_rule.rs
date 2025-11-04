@@ -1,13 +1,13 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use suricatax_rule_parser::parser::RuleScanner;
+use suricatax_rule_parser::scanner::RuleScanner;
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(s) = std::str::from_utf8(data) {
         let scanner = RuleScanner::new(s);
         for _ in scanner {
-            // Just iterate through the scanner
+            // Just iterate through all scanner events
         }
     }
 });
