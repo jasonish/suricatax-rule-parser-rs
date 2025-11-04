@@ -6,7 +6,7 @@ use clap::Parser;
 use serde::Serialize;
 use suricatax_rule_parser::{
     loader,
-    parser::{RuleScanEvent, RuleScanner},
+    scanner::{RuleScanEvent, RuleScanner},
 };
 
 #[derive(Debug, Parser)]

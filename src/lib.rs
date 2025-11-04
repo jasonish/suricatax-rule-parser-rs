@@ -9,18 +9,15 @@
 
 use nom::Offset;
 
-use parsers::ParseError;
+use scanner::ScanError;
 
 pub mod loader;
-pub mod parser;
-mod parsers;
+pub mod scanner;
 mod types;
-mod util;
 
-/// Rule parse errors.
+/// Rule scanner errors.
 ///
-/// This error type helps hide the details of the Nom based errors
-/// used internally.
+/// This error type helps hide the details of the internal scanner errors.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Error {
     pub offset: usize,
@@ -42,7 +39,11 @@ impl std::error::Error for Error {}
 
 impl Error {
     /// Create an external error from a nom error.
-    pub(crate) fn from_nom_error(err: nom::Err<ParseError<&str>>, start: &str, context: &str) -> Self {
+    pub(crate) fn from_nom_error(
+        err: nom::Err<ScanError<&str>>,
+        start: &str,
+        context: &str,
+    ) -> Self {
         match err {
             nom::Err::Incomplete(_) => Error {
                 offset: start.len(),
@@ -54,10 +55,9 @@ impl Error {
                 Error {
                     offset,
                     msg: context.to_string(),
-                    reason: err.kind.to_string(),
+                    reason: err.reason,
                 }
             }
         }
     }
 }
-
