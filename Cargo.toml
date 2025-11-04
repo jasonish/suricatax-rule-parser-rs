@@ -3,7 +3,7 @@ name = "suricatax-rule-parser"
 version = "0.2.0-alpha.1"
 authors = ["Jason Ish <jason@codemonkey.net>"]
 edition = "2021"
-rust-version = "1.63.0"
+rust-version = "1.75.0"
 description = "A parser for Suricata rules"
 repository = "https://github.com/jasonish/suricatax-rule-parser-rs"
 
