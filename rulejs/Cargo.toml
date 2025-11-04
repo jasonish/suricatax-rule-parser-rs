@@ -3,14 +3,10 @@ name = "rulejs"
 version = "0.2.0"
 edition = "2021"
 authors = ["Jason Ish <jason@codemonkey.net>"]
-
-# This requires a newer version of Rust than the library for clap,
-# etc.
-rust-version = "1.74.0"
+rust-version = "1.75.0"
 
 [dependencies]
 suricatax-rule-parser = { path = ".." }
-clap = { version = "4.5.40", features = ["derive"] }
-serde = "1.0.219"
-serde_yaml = "0.9.34"
-serde_json = "1.0.140"
+clap = { version = "4.5.51", features = ["derive"] }
+serde = "1.0.228"
+serde_json = "1.0.145"

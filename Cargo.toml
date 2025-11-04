@@ -11,8 +11,5 @@ repository = "https://github.com/jasonish/suricatax-rule-parser-rs"
 members = [".", "rulejs", "fuzz"]
 
 [dependencies]
-lazy_static = "1.4.0"
 nom = "8.0.0"
-num-traits = "0.2.18"
-serde = { version = "1.0.199", default-features = false, features = ["std", "derive"] }
-serde_json = "1.0.116"
+serde = { version = "1.0.228", default-features = false, features = ["std", "derive"] }
