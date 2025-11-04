@@ -11,7 +11,7 @@ use nom::{
     bytes::complete::{is_not, tag},
     character::complete::multispace0,
     sequence::preceded,
-    IResult,
+    IResult, Parser,
 };
 use serde::Serialize;
 
@@ -99,7 +99,7 @@ impl<'a> Iterator for RuleScanner<'a> {
                 Err(err) => Some(Err(Error::from_nom_error(err, self.buf, "source-port"))),
             },
             ScannerState::Direction => {
-                match preceded(multispace0, parse_direction)(self.next) {
+                match preceded(multispace0, parse_direction).parse(self.next) {
                     Ok((next, direction)) => {
                         self.state = self.state.next();
                         self.next = next;
@@ -256,7 +256,7 @@ impl<I> nom::error::ParseError<I> for ScanError<I> {
 /// Get the next sequence of characters up until the next whitespace,
 /// ignoring any leading whitespace.
 fn take_until_whitespace(input: &str) -> IResult<&str, &str, ScanError<&str>> {
-    preceded(multispace0, is_not(WHITESPACE))(input)
+    preceded(multispace0, is_not(WHITESPACE)).parse(input)
 }
 
 /// Scan an array returning a String of the array contents.
@@ -265,7 +265,7 @@ fn scan_array(input: &str) -> IResult<&str, &str, ScanError<&str>> {
 
     // We might not always have an array, if not, parse a scalar.
     if !input.starts_with('[') {
-        let (input, scalar) = preceded(multispace0, is_not("\n\r\t "))(input)?;
+        let (input, scalar) = preceded(multispace0, is_not("\n\r\t ")).parse(input)?;
         return Ok((input, scalar));
     }
 
@@ -330,33 +330,33 @@ fn parse_option_value(input: &str) -> IResult<&str, &str, ScanError<&str>> {
 }
 
 fn start_of_options(input: &str) -> IResult<&str, &str, ScanError<&str>> {
-    preceded(multispace0, tag("("))(input)
+    preceded(multispace0, tag("(")).parse(input)
 }
 
 fn end_of_options(input: &str) -> IResult<&str, &str> {
-    preceded(multispace0, tag(")"))(input)
+    preceded(multispace0, tag(")")).parse(input)
 }
 
 fn option_name(input: &str) -> IResult<&str, &str, ScanError<&str>> {
-    preceded(multispace0, is_not(";:"))(input)
+    preceded(multispace0, is_not(";:")).parse(input)
 }
 
 fn options_separator(input: &str) -> IResult<&str, char, ScanError<&str>> {
-    preceded(multispace0, nom::character::complete::one_of(";:"))(input)
+    preceded(multispace0, nom::character::complete::one_of(";:")).parse(input)
 }
 
 fn parse_direction(input: &str) -> IResult<&str, Direction, ScanError<&str>> {
     let parse_single = |input| -> IResult<&str, Direction, ScanError<&str>> {
-        let (input, _) = tag("->")(input)?;
+        let (input, _) = tag("->").parse(input)?;
         Ok((input, Direction::Single))
     };
 
     let parse_both = |input| -> IResult<&str, Direction, ScanError<&str>> {
-        let (input, _) = tag("<>")(input)?;
+        let (input, _) = tag("<>").parse(input)?;
         Ok((input, Direction::Both))
     };
 
-    let (rem, direction) = alt((parse_single, parse_both))(input).map_err(|_| {
+    let (rem, direction) = alt((parse_single, parse_both)).parse(input).map_err(|_| {
         nom::Err::Error(ScanError {
             reason: "invalid direction".to_string(),
             input,
