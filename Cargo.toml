@@ -1,14 +1,21 @@
-[package]
-name = "suricatax-rule-parser"
+[workspace]
+members = [".", "rulejs", "fuzz"]
+
+[workspace.package]
 version = "0.2.0-alpha.1"
 authors = ["Jason Ish <jason@codemonkey.net>"]
 edition = "2021"
 rust-version = "1.75.0"
-description = "A parser for Suricata rules"
 repository = "https://github.com/jasonish/suricatax-rule-parser-rs"
 
-[workspace]
-members = [".", "rulejs", "fuzz"]
+[package]
+name = "suricatax-rule-parser"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "A parser for Suricata rules"
 
 [dependencies]
 nom = "8.0.0"
