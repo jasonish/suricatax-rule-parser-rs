@@ -15,7 +15,7 @@ use nom::{
 };
 use serde::Serialize;
 
-use crate::{types::Direction, Error};
+use crate::Error;
 
 static WHITESPACE: &str = " \t\r\n";
 
@@ -98,16 +98,14 @@ impl<'a> Iterator for RuleScanner<'a> {
                 }
                 Err(err) => Some(Err(Error::from_nom_error(err, self.buf, "source-port"))),
             },
-            ScannerState::Direction => {
-                match preceded(multispace0, parse_direction).parse(self.next) {
-                    Ok((next, direction)) => {
-                        self.state = self.state.next();
-                        self.next = next;
-                        Some(Ok(RuleScanEvent::Direction(direction.to_string())))
-                    }
-                    Err(err) => Some(Err(Error::from_nom_error(err, self.buf, "direction"))),
+            ScannerState::Direction => match parse_direction(self.next) {
+                Ok((next, direction)) => {
+                    self.state = self.state.next();
+                    self.next = next;
+                    Some(Ok(RuleScanEvent::Direction(direction.to_string())))
                 }
-            }
+                Err(err) => Some(Err(Error::from_nom_error(err, self.buf, "direction"))),
+            },
             ScannerState::DestIp => match scan_array(self.next) {
                 Ok((next, v)) => {
                     self.state = self.state.next();
@@ -345,24 +343,15 @@ fn options_separator(input: &str) -> IResult<&str, char, ScanError<&str>> {
     preceded(multispace0, nom::character::complete::one_of(";:")).parse(input)
 }
 
-fn parse_direction(input: &str) -> IResult<&str, Direction, ScanError<&str>> {
-    let parse_single = |input| -> IResult<&str, Direction, ScanError<&str>> {
-        let (input, _) = tag("->").parse(input)?;
-        Ok((input, Direction::Single))
-    };
-
-    let parse_both = |input| -> IResult<&str, Direction, ScanError<&str>> {
-        let (input, _) = tag("<>").parse(input)?;
-        Ok((input, Direction::Both))
-    };
-
-    let (rem, direction) = alt((parse_single, parse_both)).parse(input).map_err(|_| {
-        nom::Err::Error(ScanError {
-            reason: "invalid direction".to_string(),
-            input,
+fn parse_direction(input: &str) -> IResult<&str, &str, ScanError<&str>> {
+    preceded(multispace0, alt((tag("->"), tag("<>"))))
+        .parse(input)
+        .map_err(|_: nom::Err<ScanError<&str>>| {
+            nom::Err::Error(ScanError {
+                reason: "invalid direction".to_string(),
+                input,
+            })
         })
-    })?;
-    Ok((rem, direction))
 }
 
 #[cfg(test)]

@@ -12,7 +12,6 @@ use nom::Offset;
 use scanner::ScanError;
 
 pub mod scanner;
-mod types;
 
 /// Rule scanner errors.
 ///
