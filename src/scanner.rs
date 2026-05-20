@@ -30,9 +30,9 @@ pub enum RuleScanEvent {
     Direction(String),
     DestIp(String),
     DestPort(String),
-    StartOfOptions(String),
+    StartOfOptions,
     Option { name: String, value: Option<String> },
-    EndOfOptions(String),
+    EndOfOptions,
 }
 
 /// A streaming scanner for Suricata rules.
@@ -127,10 +127,10 @@ impl<'a> Iterator for RuleScanner<'a> {
                 ))),
             },
             ScannerState::StartOfOptions => match start_of_options(self.next) {
-                Ok((next, value)) => {
+                Ok((next, _)) => {
                     self.state = self.state.next();
                     self.next = next;
-                    Some(Ok(RuleScanEvent::StartOfOptions(value.to_string())))
+                    Some(Ok(RuleScanEvent::StartOfOptions))
                 }
                 Err(err) => Some(Err(Error::from_nom_error(
                     err,
@@ -139,10 +139,10 @@ impl<'a> Iterator for RuleScanner<'a> {
                 ))),
             },
             ScannerState::Options => {
-                if let Ok((next, v)) = end_of_options(self.next) {
+                if let Ok((next, _)) = end_of_options(self.next) {
                     self.next = next;
                     self.done = true;
-                    return Some(Ok(RuleScanEvent::EndOfOptions(v.to_string())));
+                    return Some(Ok(RuleScanEvent::EndOfOptions));
                 }
                 let name = match option_name(self.next) {
                     Ok((rem, name)) => {
@@ -387,10 +387,7 @@ mod test {
         assert_eq!(dest_port, RuleScanEvent::DestPort("any".to_string()));
 
         let start_of_options = scanner.next().unwrap().unwrap();
-        assert_eq!(
-            start_of_options,
-            RuleScanEvent::StartOfOptions("(".to_string())
-        );
+        assert_eq!(start_of_options, RuleScanEvent::StartOfOptions);
 
         let option = scanner.next().unwrap().unwrap();
         assert_eq!(
@@ -429,7 +426,7 @@ mod test {
         );
 
         let event = scanner.next().unwrap().unwrap();
-        assert_eq!(event, RuleScanEvent::EndOfOptions(")".to_string()));
+        assert_eq!(event, RuleScanEvent::EndOfOptions);
 
         let event = scanner.next();
         assert_eq!(event, None);

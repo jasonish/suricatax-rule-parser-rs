@@ -129,11 +129,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         RuleScanEvent::DestPort(port) => {
                             rule.dest_port = port.to_string();
                         }
-                        RuleScanEvent::StartOfOptions(_) => {}
+                        RuleScanEvent::StartOfOptions => {}
                         RuleScanEvent::Option { name, value } => {
                             rule.option.push(PrettyRuleOption { name, value });
                         }
-                        RuleScanEvent::EndOfOptions(_) => {}
+                        RuleScanEvent::EndOfOptions => {}
                     },
                     Err(e) => {
                         eprintln!("Error scanning rule: {:?} -- {}", e, line);
