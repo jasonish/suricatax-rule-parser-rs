@@ -19,17 +19,12 @@ pub mod scanner;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Error {
     pub offset: usize,
-    pub msg: String,
     pub reason: String,
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "error at offset {}: {} ({})",
-            self.offset, self.msg, self.reason
-        )
+        write!(f, "error at offset {}: {}", self.offset, self.reason)
     }
 }
 
@@ -45,15 +40,13 @@ impl Error {
         match err {
             nom::Err::Incomplete(_) => Error {
                 offset: start.len(),
-                msg: context.to_string(),
-                reason: "incomplete".to_string(),
+                reason: format!("{context}: incomplete"),
             },
             nom::Err::Failure(err) | nom::Err::Error(err) => {
                 let offset = start.offset(err.input);
                 Error {
                     offset,
-                    msg: context.to_string(),
-                    reason: err.reason,
+                    reason: format!("{}: {}", context, err.reason),
                 }
             }
         }
