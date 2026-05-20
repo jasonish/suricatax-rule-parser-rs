@@ -17,6 +17,7 @@ pub mod scanner;
 ///
 /// This error type helps hide the details of the internal scanner errors.
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[non_exhaustive]
 pub struct Error {
     pub offset: usize,
     pub reason: String,

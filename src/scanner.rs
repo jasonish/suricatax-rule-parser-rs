@@ -22,6 +22,7 @@ static WHITESPACE: &str = " \t\r\n";
 /// Events emitted by the rule scanner.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum RuleScanEvent {
     Action(String),
     Protocol(String),

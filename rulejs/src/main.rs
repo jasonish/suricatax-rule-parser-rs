@@ -134,6 +134,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             rule.option.push(PrettyRuleOption { name, value });
                         }
                         RuleScanEvent::EndOfOptions => {}
+                        _ => {}
                     },
                     Err(e) => {
                         eprintln!("Error scanning rule: {:?} -- {}", e, line);
