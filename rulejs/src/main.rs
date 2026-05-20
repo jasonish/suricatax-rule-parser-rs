@@ -1,13 +1,40 @@
 // SPDX-FileCopyrightText: (C) 2021 Jason Ish <jason@codemonkey.net>
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read};
+
 use clap::Parser;
 
 use serde::Serialize;
-use suricatax_rule_parser::{
-    loader,
-    scanner::{RuleScanEvent, RuleScanner},
-};
+use suricatax_rule_parser::scanner::{RuleScanEvent, RuleScanner};
+
+/// Read the next logical rule line from `reader`, joining any
+/// trailing-backslash continuations into one string.
+fn next_line<R: BufRead>(reader: &mut R) -> std::io::Result<Option<String>> {
+    let mut buf = String::new();
+    for line in reader.lines() {
+        let line = line?;
+        if let Some(stripped) = line.trim_end().strip_suffix('\\') {
+            buf.push_str(stripped);
+        } else if buf.is_empty() {
+            return Ok(Some(line));
+        } else {
+            buf.push_str(&line);
+            return Ok(Some(buf));
+        }
+    }
+    Ok(None)
+}
+
+fn open_reader(filename: &str) -> std::io::Result<Box<dyn BufRead>> {
+    let reader: Box<dyn Read> = if filename == "-" {
+        Box::new(std::io::stdin())
+    } else {
+        Box::new(File::open(filename)?)
+    };
+    Ok(Box::new(BufReader::new(reader)))
+}
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -58,13 +85,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut count = 0;
 
     for filename in &filenames {
-        let mut loader = if filename == "-" {
-            loader::from_reader(std::io::stdin(), Some(filename.to_string()))
-        } else {
-            loader::from_filename(filename)?
-        };
+        let mut reader = open_reader(filename)?;
 
-        while let Some(line) = loader.next_line()? {
+        while let Some(line) = next_line(&mut reader)? {
             let line = line.trim();
 
             // Skip empty lines.

@@ -11,7 +11,6 @@ use nom::Offset;
 
 use scanner::ScanError;
 
-pub mod loader;
 pub mod scanner;
 mod types;
 
