@@ -7,6 +7,7 @@ authors = ["Jason Ish <jason@codemonkey.net>"]
 edition = "2021"
 rust-version = "1.75.0"
 repository = "https://github.com/jasonish/suricatax-rule-parser-rs"
+license = "MIT OR Apache-2.0"
 
 [package]
 name = "suricatax-rule-parser"
@@ -15,7 +16,13 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+license.workspace = true
 description = "A parser for Suricata rules"
+readme = "README.md"
+documentation = "https://docs.rs/suricatax-rule-parser"
+keywords = ["suricata", "ids", "rules", "parser"]
+categories = ["parser-implementations"]
+exclude = ["/.github/**", "/fuzz/**", "/rulejs/**"]
 
 [dependencies]
 nom = "8.0.0"

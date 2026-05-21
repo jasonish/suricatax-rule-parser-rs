@@ -1,20 +1,36 @@
-# Experimental Suricata Rule Parser in Rust
+# suricatax-rule-parser
 
-This is an experimental Suricata rule parser that is trying to represent rules
-in a format somewhat like an abstract rule parser. It could remove the low level
-details of rule parsing from applications, leaving the application to apply
-meaning to structured rule elements.
+Experimental Rust scanner for Suricata rules.
 
-## Tools
+The crate tokenizes a rule into header fields and raw option events. It does not
+try to fully interpret option semantics; applications can layer their own
+validation or higher-level parsing on top of the event stream.
 
-### rjs
+## Example
 
-`rjs` is an example application that can convert rules to JSON or YAML. This
-isn't hard to do once rules are parsed into Rust data structures. Leveraging the
-power of Serde, it is easy to convert the rules to JSON or YAML.
+```rust
+use suricatax_rule_parser::scanner::{RuleScanEvent, RuleScanner};
 
-Example usage:
+fn main() -> Result<(), suricatax_rule_parser::Error> {
+    let rule = r#"alert tcp any any -> any any (msg:"TEST"; sid:1;)"#;
 
+    for event in RuleScanner::new(rule) {
+        match event? {
+            RuleScanEvent::Action(action) => println!("action={action}"),
+            RuleScanEvent::Option { name, value } => println!("{name}={value:?}"),
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
 ```
-cargo run -p rjs -- /var/lib/suricata/rules/suricata.rules | jq
-```
+
+## License
+
+Licensed under either of:
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.

@@ -5,6 +5,7 @@ edition.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+publish = false
 
 [dependencies]
 suricatax-rule-parser = { path = ".." }
